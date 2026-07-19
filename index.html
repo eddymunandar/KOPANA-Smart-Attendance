@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>KOPANA Smart Attendance RAT</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+<style>
+  :root{
+    --kp-navy:      #0B1F3A;
+    --kp-blue-800:  #10305E;
+    --kp-blue-700:  #123A70;
+    --kp-blue-600:  #1A4B8C;
+    --kp-blue-500:  #1F5FBF;
+    --kp-blue-100:  #E8F0FC;
+    --kp-blue-50:   #F4F8FF;
+    --kp-gold:      #C99A3D;
+    --kp-gold-soft: #F3E6C8;
+    --kp-surface:   #F5F7FB;
+    --kp-ink:       #1B2430;
+    --kp-ink-soft:  #5B6472;
+    --kp-line:      #E3E8F0;
+    --kp-success:   #16A34A;
+    --kp-danger:    #DC2626;
+    --kp-warning:   #D97706;
+    --kp-radius:    14px;
+    --kp-radius-sm: 10px;
+    --kp-shadow:    0 8px 24px rgba(11,31,58,.08);
+    --kp-font-display: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    --kp-font-body: 'Inter', 'Segoe UI', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    font-family: var(--kp-font-body);
+    background: var(--kp-surface);
+    color: var(--kp-ink);
+    margin:0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1,h2,h3,h4,h5,h6, .kp-display{ font-family: var(--kp-font-display); letter-spacing:-.01em; }
+  a{ text-decoration:none; }
+
+  /* ---------- Utility ---------- */
+  .kp-hidden{ display:none !important; }
+  .kp-text-muted{ color: var(--kp-ink-soft); }
+  .kp-fw-700{ font-weight:700; }
+
+  /* ---------- Loading splash ---------- */
+  #kp-splash{
+    position:fixed; inset:0; z-index:2000;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: linear-gradient(160deg, var(--kp-navy) 0%, var(--kp-blue-700) 100%);
+    color:#fff;
+  }
+  #kp-splash .kp-logo-mark{
+    width:64px; height:64px; border-radius:18px; background:rgba(255,255,255,.12);
+    display:flex; align-items:center; justify-content:center; font-size:28px; margin-bottom:16px;
+    border:1px solid rgba(255,255,255,.25);
+  }
+  .kp-spinner{
+    width:34px;height:34px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.25); border-top-color:#fff;
+    animation: kp-spin 0.8s linear infinite; margin-top:18px;
+  }
+  @keyframes kp-spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Login ---------- */
+  #login-shell{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(circle at 15% 15%, rgba(201,154,61,.18), transparent 40%),
+      linear-gradient(160deg, var(--kp-navy) 0%, var(--kp-blue-700) 55%, var(--kp-blue-600) 100%);
+    padding:20px;
+  }
+  .kp-login-card{
+    width:100%; max-width:400px; background:#fff; border-radius:20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35); padding:36px 32px 28px; text-align:center;
+  }
+  .kp-login-mark{
+    width:56px;height:56px;border-radius:16px;margin:0 auto 14px;
+    background: linear-gradient(135deg, var(--kp-blue-600), var(--kp-blue-800));
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px;
+    box-shadow: var(--kp-shadow);
+  }
+  .kp-login-card h1{ font-size:1.35rem; margin-bottom:2px; }
+  .kp-login-card .kp-sub{ color:var(--kp-ink-soft); font-size:.88rem; margin-bottom:22px; }
+  .kp-login-card .form-label{ font-size:.82rem; font-weight:600; text-align:left; display:block; color:var(--kp-ink); }
+  .kp-login-card .form-control{
+    border-radius: var(--kp-radius-sm); padding:11px 14px; border:1.5px solid var(--kp-line); font-size:.95rem;
+  }
+  .kp-login-card .form-control:focus{ border-color: var(--kp-blue-500); box-shadow:0 0 0 .2rem rgba(31,95,191,.15); }
+  .kp-btn-primary{
+    background: linear-gradient(135deg, var(--kp-blue-600), var(--kp-blue-800));
+    border:none; color:#fff; font-weight:700; border-radius: var(--kp-radius-sm);
+    padding:11px 18px; letter-spacing:.01em; transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .kp-btn-primary:hover{ color:#fff; transform:translateY(-1px); box-shadow:0 10px 24px rgba(18,58,112,.3); }
+  .kp-btn-gold{
+    background: linear-gradient(135deg, var(--kp-gold), #A97F27); border:none; color:#fff; font-weight:700;
+    border-radius: var(--kp-radius-sm);
+  }
+
+  /* ---------- App shell ---------- */
+  #app-shell{ display:flex; min-height:100vh; }
+  .kp-sidebar{
+    width:250px; flex-shrink:0; background: var(--kp-navy); color:#cfd9ec;
+    display:flex; flex-direction:column; padding:20px 14px;
+  }
+  .kp-sidebar .kp-brand{ display:flex; align-items:center; gap:10px; color:#fff; padding:0 8px 22px; }
+  .kp-sidebar .kp-brand .mark{
+    width:38px;height:38px;border-radius:11px; background:rgba(255,255,255,.12);
+    display:flex; align-items:center; justify-content:center; font-size:17px; border:1px solid rgba(255,255,255,.18);
+  }
+  .kp-sidebar .kp-brand .txt strong{ display:block; font-size:.95rem; line-height:1.1; }
+  .kp-sidebar .kp-brand .txt span{ font-size:.7rem; color:#8fa3c4; }
+
+  .kp-nav-item{
+    display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:12px;
+    color:#c3cee3; font-weight:600; font-size:.9rem; cursor:pointer; margin-bottom:4px;
+    transition: background .15s ease, color .15s ease;
+  }
+  .kp-nav-item i{ width:20px; text-align:center; opacity:.9; }
+  .kp-nav-item:hover{ background: rgba(255,255,255,.06); color:#fff; }
+  .kp-nav-item.active{ background: linear-gradient(135deg, var(--kp-blue-500), var(--kp-blue-700)); color:#fff; box-shadow: 0 6px 16px rgba(31,95,191,.35); }
+  .kp-nav-item.logout{ margin-top:auto; color:#f3a8a8; }
+  .kp-nav-item.logout:hover{ background: rgba(220,38,38,.12); color:#ff8a8a; }
+  .kp-sidebar-footer{ font-size:.68rem; color:#6f81a2; padding:10px 8px 0; }
+
+  .kp-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .kp-topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:14px 22px; background:#fff; border-bottom:1px solid var(--kp-line); position:sticky; top:0; z-index:50;
+  }
+  .kp-topbar .kp-page-title{ font-size:1.05rem; font-weight:700; }
+  .kp-topbar .kp-user-chip{
+    display:flex; align-items:center; gap:8px; background: var(--kp-blue-50); border:1px solid var(--kp-line);
+    padding:6px 12px 6px 6px; border-radius:999px; font-size:.82rem; font-weight:600;
+  }
+  .kp-user-chip .avatar{
+    width:26px;height:26px;border-radius:50%; background: var(--kp-blue-600); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700;
+  }
+  .kp-content{ padding:20px 22px 90px; flex:1; }
+
+  .kp-burger{ display:none; border:none; background:none; font-size:1.25rem; color: var(--kp-navy); }
+
+  /* ---------- Cards / stats ---------- */
+  .kp-stat-card{
+    background:#fff; border-radius: var(--kp-radius); border:1px solid var(--kp-line); padding:18px 20px;
+    box-shadow: var(--kp-shadow); display:flex; align-items:center; gap:14px; height:100%;
+  }
+  .kp-stat-card .icon{
+    width:46px;height:46px;border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:19px; color:#fff; flex-shrink:0;
+  }
+  .kp-stat-card .value{ font-size:1.5rem; font-weight:800; font-family:var(--kp-font-display); line-height:1; }
+  .kp-stat-card .label{ font-size:.78rem; color:var(--kp-ink-soft); font-weight:600; margin-top:3px; }
+  .kp-icon-blue{ background: linear-gradient(135deg, var(--kp-blue-500), var(--kp-blue-700)); }
+  .kp-icon-gold{ background: linear-gradient(135deg, var(--kp-gold), #A97F27); }
+  .kp-icon-navy{ background: linear-gradient(135deg, var(--kp-navy), var(--kp-blue-800)); }
+
+  .kp-card{ background:#fff; border-radius: var(--kp-radius); border:1px solid var(--kp-line); box-shadow: var(--kp-shadow); }
+  .kp-card-header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:16px 18px; border-bottom:1px solid var(--kp-line);
+  }
+  .kp-card-header h2{ font-size:1rem; font-weight:700; margin:0; }
+  .kp-card-body{ padding:18px; }
+
+  .kp-badge{ display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:.72rem; font-weight:700; }
+  .kp-badge-aktif{ background:#E7F7EC; color:var(--kp-success); }
+  .kp-badge-draft{ background:#FFF4E0; color:var(--kp-warning); }
+  .kp-badge-tutup{ background:#F1F3F6; color:var(--kp-ink-soft); }
+
+  .table > :not(caption) > * > *{ font-size:.87rem; }
+  .kp-table thead th{
+    background: var(--kp-blue-50); color: var(--kp-blue-700); font-size:.72rem; text-transform:uppercase;
+    letter-spacing:.04em; border-bottom:none; padding:10px 12px;
+  }
+  .kp-table tbody td{ padding:10px 12px; vertical-align:middle; border-color:var(--kp-line); }
+
+  /* ---------- Scanner ---------- */
+  .kp-scan-wrap{ max-width:480px; margin:0 auto; }
+  .kp-scan-frame{
+    position:relative; border-radius:20px; overflow:hidden; background:#000; aspect-ratio: 1/1;
+    box-shadow: var(--kp-shadow); border:1px solid var(--kp-line);
+  }
+  #qr-reader{ width:100%; height:100%; }
+  #qr-reader video{ object-fit:cover; width:100% !important; height:100% !important; }
+  .kp-scan-corner{
+    position:absolute; width:34px; height:34px; border-color: var(--kp-gold); pointer-events:none; z-index:5;
+  }
+  .kp-scan-corner.tl{ top:14px; left:14px; border-top:4px solid var(--kp-gold); border-left:4px solid var(--kp-gold); border-radius:8px 0 0 0; }
+  .kp-scan-corner.tr{ top:14px; right:14px; border-top:4px solid var(--kp-gold); border-right:4px solid var(--kp-gold); border-radius:0 8px 0 0; }
+  .kp-scan-corner.bl{ bottom:14px; left:14px; border-bottom:4px solid var(--kp-gold); border-left:4px solid var(--kp-gold); border-radius:0 0 0 8px; }
+  .kp-scan-corner.br{ bottom:14px; right:14px; border-bottom:4px solid var(--kp-gold); border-right:4px solid var(--kp-gold); border-radius:0 0 8px 0; }
+  .kp-scan-line{
+    position:absolute; left:8%; right:8%; height:2px; background: linear-gradient(90deg, transparent, var(--kp-gold), transparent);
+    top:10%; animation: kp-scan-move 2.2s ease-in-out infinite; z-index:4; box-shadow:0 0 12px var(--kp-gold);
+  }
+  @keyframes kp-scan-move{ 0%{ top:10%; } 50%{ top:88%; } 100%{ top:10%; } }
+
+  .kp-scan-result{
+    margin-top:16px; border-radius: var(--kp-radius); padding:16px 18px; display:flex; gap:14px; align-items:center;
+    animation: kp-pop .25s ease;
+  }
+  @keyframes kp-pop{ from{ transform:scale(.96); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .kp-scan-result.ok{ background:#EAF9EF; border:1.5px solid #BCEBC9; }
+  .kp-scan-result.err{ background:#FDECEC; border:1.5px solid #F6C6C6; }
+  .kp-scan-result .ic{ font-size:1.7rem; }
+  .kp-scan-result.ok .ic{ color:var(--kp-success); }
+  .kp-scan-result.err .ic{ color:var(--kp-danger); }
+  .kp-scan-result .title{ font-weight:800; font-size:1rem; }
+  .kp-scan-result .sub{ font-size:.82rem; color:var(--kp-ink-soft); }
+
+  .kp-event-active-chip{
+    display:inline-flex; align-items:center; gap:8px; background: var(--kp-gold-soft); color:#8a6817;
+    border-radius:999px; padding:6px 14px; font-size:.8rem; font-weight:700; margin-bottom:14px;
+  }
+
+  /* ---------- Offcanvas / mobile ---------- */
+  @media (max-width: 900px){
+    .kp-sidebar{ display:none; }
+    .kp-burger{ display:inline-flex; }
+    .kp-content{ padding:16px 14px 90px; }
+    .kp-topbar{ padding:12px 14px; }
+  }
+
+  .kp-offcanvas .offcanvas-body{ background: var(--kp-navy); padding:18px 12px; }
+
+  /* ---------- Print ---------- */
+  @media print{
+    #app-shell > *:not(.kp-content), .kp-no-print{ display:none !important; }
+    .kp-content{ padding:0; }
+    body{ background:#fff; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Splash / Loading ===== -->
+  <div id="kp-splash">
+    <div class="kp-logo-mark"><i class="fa-solid fa-clipboard-check"></i></div>
+    <div class="kp-display" style="font-weight:700; letter-spacing:.02em;">KOPANA</div>
+    <div style="font-size:.78rem; color:#b9c6de; margin-top:2px;">Smart Attendance RAT</div>
+    <div class="kp-spinner"></div>
+  </div>
+
+  <!-- ===== Login ===== -->
+<div id="login-shell" class="kp-hidden">
+  <div class="kp-login-card">
+    <div class="kp-login-mark"><i class="fa-solid fa-clipboard-check"></i></div>
+    <h1>KOPANA</h1>
+    <div class="kp-sub">Smart Attendance &middot; Rapat Anggota Tahunan</div>
+
+    <form id="form-login" autocomplete="off">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-control" id="login-username" placeholder="Masukkan username" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <div class="input-group">
+          <input type="password" class="form-control" id="login-password" placeholder="Masukkan password" required>
+          <button class="btn btn-outline-secondary" type="button" id="btn-toggle-password" style="border-radius:0 10px 10px 0;">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="btn kp-btn-primary w-100 mt-2" id="btn-login">
+        <span id="btn-login-text">Masuk</span>
+        <span id="btn-login-spinner" class="spinner-border spinner-border-sm kp-hidden ms-2"></span>
+      </button>
+    </form>
+
+    <div class="kp-text-muted mt-4" style="font-size:.72rem;">
+      Absensi khusus Rapat Anggota Tahunan KOPANA
+    </div>
+  </div>
+</div>
+
+  <!-- ===== App Shell (setelah login) ===== -->
+  <div id="app-shell" class="kp-hidden">
+
+    <!-- Sidebar (desktop) -->
+    <aside class="kp-sidebar">
+      <div class="kp-brand">
+        <div class="mark"><i class="fa-solid fa-clipboard-check"></i></div>
+        <div class="txt"><strong id="kp-brand-name">KOPANA</strong><span>Smart Attendance RAT</span></div>
+      </div>
+      <nav id="kp-nav-desktop"></nav>
+      <div class="kp-sidebar-footer">v1.1 &middot; Absensi RAT</div>
+    </aside>
+
+    <!-- Offcanvas sidebar (mobile) -->
+    <div class="offcanvas offcanvas-start kp-offcanvas" tabindex="-1" id="kpOffcanvas">
+      <div class="offcanvas-body">
+        <div class="kp-brand" style="padding-top:4px;">
+          <div class="mark"><i class="fa-solid fa-clipboard-check"></i></div>
+          <div class="txt"><strong>KOPANA</strong><span>Smart Attendance RAT</span></div>
+        </div>
+        <nav id="kp-nav-mobile"></nav>
+      </div>
+    </div>
+
+    <div class="kp-main">
+      <header class="kp-topbar">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="kp-burger" data-bs-toggle="offcanvas" data-bs-target="#kpOffcanvas"><i class="fa-solid fa-bars"></i></button>
+          <div class="kp-page-title" id="kp-page-title">Dashboard</div>
+        </div>
+        <div class="kp-user-chip">
+          <div class="avatar" id="kp-user-avatar">A</div>
+          <span id="kp-user-name">-</span>
+        </div>
+      </header>
+
+      <main class="kp-content">
+<section id="page-dashboard" class="kp-page">
+  <div class="mb-3">
+    <h4 class="kp-fw-700 mb-0">Selamat datang, <span id="dash-welcome-name">Petugas</span> 👋</h4>
+    <div class="kp-text-muted" style="font-size:.86rem;">Ringkasan absensi Rapat Anggota Tahunan KOPANA</div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-4">
+      <div class="kp-stat-card">
+        <div class="icon kp-icon-blue"><i class="fa-solid fa-users"></i></div>
+        <div>
+          <div class="value" id="stat-anggota-aktif">0</div>
+          <div class="label">Anggota Aktif</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-4">
+      <div class="kp-stat-card">
+        <div class="icon kp-icon-gold"><i class="fa-solid fa-calendar-check"></i></div>
+        <div>
+          <div class="value" id="stat-event-aktif" style="font-size:1rem;">-</div>
+          <div class="label">Event Aktif</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="kp-stat-card">
+        <div class="icon kp-icon-navy"><i class="fa-solid fa-user-check"></i></div>
+        <div>
+          <div class="value" id="stat-hadir-hari-ini">0</div>
+          <div class="label">Hadir Hari Ini</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kp-card">
+    <div class="kp-card-header">
+      <h2><i class="fa-solid fa-bolt kp-text-muted"></i> Akses Cepat</h2>
+    </div>
+    <div class="kp-card-body">
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <button class="btn w-100 py-3 kp-quick-nav" data-page="scanner" style="border:1.5px solid var(--kp-line); border-radius:var(--kp-radius-sm); background:#fff;">
+            <i class="fa-solid fa-qrcode d-block mb-2" style="font-size:1.3rem; color:var(--kp-blue-600);"></i>
+            <span style="font-size:.82rem; font-weight:600;">Scan QR</span>
+          </button>
+        </div>
+        <div class="col-6 col-md-3">
+          <button class="btn w-100 py-3 kp-quick-nav" data-page="event" style="border:1.5px solid var(--kp-line); border-radius:var(--kp-radius-sm); background:#fff;">
+            <i class="fa-solid fa-calendar-days d-block mb-2" style="font-size:1.3rem; color:var(--kp-blue-600);"></i>
+            <span style="font-size:.82rem; font-weight:600;">Event RAT</span>
+          </button>
+        </div>
+        <div class="col-6 col-md-3">
+          <button class="btn w-100 py-3 kp-quick-nav" data-page="attendance" style="border:1.5px solid var(--kp-line); border-radius:var(--kp-radius-sm); background:#fff;">
+            <i class="fa-solid fa-list-check d-block mb-2" style="font-size:1.3rem; color:var(--kp-blue-600);"></i>
+            <span style="font-size:.82rem; font-weight:600;">Data Kehadiran</span>
+          </button>
+        </div>
+        <div class="col-6 col-md-3">
+          <button class="btn w-100 py-3 kp-quick-nav" data-page="setting" style="border:1.5px solid var(--kp-line); border-radius:var(--kp-radius-sm); background:#fff;">
+            <i class="fa-solid fa-gear d-block mb-2" style="font-size:1.3rem; color:var(--kp-blue-600);"></i>
+            <span style="font-size:.82rem; font-weight:600;">Pengaturan</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="page-event" class="kp-page kp-hidden">
+  <div class="kp-card">
+    <div class="kp-card-header">
+      <h2><i class="fa-solid fa-calendar-days kp-text-muted"></i> Event RAT</h2>
+      <button class="btn kp-btn-primary btn-sm kp-admin-only" id="btn-open-add-event">
+        <i class="fa-solid fa-plus me-1"></i> Tambah Event
+      </button>
+    </div>
+    <div class="kp-card-body">
+      <div class="table-responsive">
+        <table class="table kp-table align-middle">
+          <thead>
+            <tr>
+              <th>Nama Event</th>
+              <th>Tanggal</th>
+              <th>Status</th>
+              <th class="kp-admin-only">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="event-table-body">
+            <tr><td colspan="4" class="text-center kp-text-muted py-4">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Modal Tambah/Edit Event -->
+<div class="modal fade" id="modalEvent" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:16px; border:none;">
+      <div class="modal-header">
+        <h5 class="modal-title kp-fw-700" id="modalEventTitle">Tambah Event RAT</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="form-event">
+        <div class="modal-body">
+          <input type="hidden" id="event-id">
+          <div class="mb-3">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">Nama Event</label>
+            <input type="text" class="form-control" id="event-nama" placeholder="Contoh: RAT KOPANA Tahun Buku 2025" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">Tanggal</label>
+            <input type="date" class="form-control" id="event-tanggal" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn kp-btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<section id="page-scanner" class="kp-page kp-hidden">
+  <div class="kp-scan-wrap">
+
+    <div id="scanner-no-event" class="kp-card kp-hidden text-center py-5 px-3 mb-3">
+      <i class="fa-solid fa-calendar-xmark mb-2" style="font-size:2rem; color:var(--kp-ink-soft);"></i>
+      <div class="kp-fw-700">Belum ada Event RAT yang aktif</div>
+      <div class="kp-text-muted" style="font-size:.85rem;">Minta Admin mengaktifkan salah satu Event di menu Event RAT.</div>
+    </div>
+
+    <div id="scanner-active-wrap">
+      <div class="text-center">
+        <span class="kp-event-active-chip"><i class="fa-solid fa-circle" style="font-size:.5rem;"></i> <span id="scanner-event-name">-</span></span>
+      </div>
+
+      <!-- Input Manual No Anggota (cadangan bila kamera bermasalah / QR rusak) -->
+      <div class="kp-card mb-3" style="padding:14px 16px;">
+        <div class="kp-fw-700 mb-2" style="font-size:.85rem;"><i class="fa-solid fa-keyboard kp-text-muted me-1"></i> Input No Anggota</div>
+        <form id="form-manual-scan">
+          <div class="input-group">
+            <input type="text" class="form-control" id="manual-no-anggota" placeholder="Ketik No Anggota..." autocomplete="off" inputmode="numeric">
+            <button class="btn kp-btn-primary" type="submit" id="btn-manual-scan">
+              <i class="fa-solid fa-user-check"></i> Hadir
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="kp-scan-frame">
+        <div id="qr-reader"></div>
+        <div class="kp-scan-corner tl"></div>
+        <div class="kp-scan-corner tr"></div>
+        <div class="kp-scan-corner bl"></div>
+        <div class="kp-scan-corner br"></div>
+        <div class="kp-scan-line"></div>
+      </div>
+
+      <div class="text-center kp-text-muted mt-2" style="font-size:.8rem;">
+        Arahkan kamera ke QR Code kartu anggota, atau ketik No Anggota di atas.
+      </div>
+
+      <div id="scan-result-box"></div>
+
+      <div class="text-center mt-3">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-toggle-camera">
+          <i class="fa-solid fa-rotate"></i> Ganti Kamera
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="page-attendance" class="kp-page kp-hidden">
+  <div class="kp-card">
+    <div class="kp-card-header">
+      <h2><i class="fa-solid fa-list-check kp-text-muted"></i> Data Kehadiran</h2>
+      <div class="d-flex gap-2 kp-no-print">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-print-attendance">
+          <i class="fa-solid fa-print me-1"></i> Cetak
+        </button>
+        <button class="btn kp-btn-gold btn-sm" id="btn-export-attendance">
+          <i class="fa-solid fa-file-excel me-1"></i> Export Excel
+        </button>
+      </div>
+    </div>
+    <div class="kp-card-body">
+      <div class="row g-2 mb-3 kp-no-print">
+        <div class="col-12 col-md-6">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass kp-text-muted"></i></span>
+            <input type="text" class="form-control" id="attendance-search" placeholder="Cari No Anggota / Nama...">
+          </div>
+        </div>
+        <div class="col-8 col-md-4">
+          <select class="form-select" id="attendance-filter-ranting">
+            <option value="">Semua Ranting</option>
+          </select>
+        </div>
+        <div class="col-4 col-md-2">
+          <button class="btn btn-outline-secondary w-100" id="btn-refresh-attendance"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+      </div>
+
+      <div class="mb-2" style="display:none;" id="print-header">
+        <h4 class="text-center mb-0">Daftar Hadir RAT KOPANA</h4>
+        <p class="text-center kp-text-muted" id="print-event-name"></p>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table kp-table align-middle">
+          <thead>
+            <tr>
+              <th style="width:50px;">No</th>
+              <th>No Anggota</th>
+              <th>Nama</th>
+              <th>Ranting</th>
+              <th>Jam Hadir</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="attendance-table-body">
+            <tr><td colspan="6" class="text-center kp-text-muted py-4">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="kp-text-muted mt-2" style="font-size:.8rem;" id="attendance-total-info">Total: 0 hadir</div>
+    </div>
+  </div>
+</section>
+<section id="page-setting" class="kp-page kp-hidden">
+  <div class="kp-card">
+    <div class="kp-card-header">
+      <h2><i class="fa-solid fa-gear kp-text-muted"></i> Pengaturan</h2>
+    </div>
+    <div class="kp-card-body">
+      <form id="form-settings">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">Nama Koperasi</label>
+            <input type="text" class="form-control" id="set-nama-koperasi" placeholder="KOPANA">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">URL Logo</label>
+            <input type="text" class="form-control" id="set-logo-url" placeholder="https://...">
+          </div>
+
+          <div class="col-12"><hr></div>
+
+          <div class="col-12">
+            <div class="kp-fw-700 mb-2" style="font-size:.85rem;">Pengaturan Scanner</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">Kamera Default</label>
+            <select class="form-select" id="set-scanner-facing">
+              <option value="environment">Kamera Belakang</option>
+              <option value="user">Kamera Depan</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label kp-fw-700" style="font-size:.82rem;">Volume Beep (<span id="beep-volume-label">70</span>%)</label>
+            <input type="range" class="form-range" id="set-beep-volume" min="0" max="100" value="70">
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" id="btn-test-beep">
+              <i class="fa-solid fa-volume-high me-1"></i> Tes Suara
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 kp-admin-only">
+          <button type="submit" class="btn kp-btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i> Simpan Pengaturan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Bootstrap 5 JS bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- HTML5 QR Code scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- SheetJS untuk Export Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+/* =========================================================
+   KOPANA Smart Attendance RAT - AppJs.html
+   Satu-satunya file JavaScript aplikasi (SPA sederhana).
+   Arsitektur: Frontend (GitHub Pages) -> fetch -> Apps Script API -> Router -> Service -> Sheets
+   ========================================================= */
+
+/* ============================================================
+   PENTING: Ganti nilai API_URL di bawah dengan URL Web App
+   Apps Script Anda (yang berakhiran /exec).
+   ============================================================ */
+var API_URL = 'https://script.google.com/macros/s/AKfycbwJiiLGcVlXWf3xELIcWTSoNtYSyGmbF4iQwxahWtxuV2Gpds0sKFzr_jl8Gm1tqa4c/exec';
+
+var STATE = {
+  token: sessionStorage.getItem('kp_token') || null,
+  user: null,
+  settings: {},
+  currentPage: 'dashboard',
+  activeEventId: null,
+  html5QrCode: null,
+  scannerRunning: false,
+  scanLocked: false,
+  cameraFacing: 'environment',
+  audioCtx: null,
+  attendanceInterval: null
+};
+
+var NAV_ITEMS = [
+  { key: 'dashboard',   label: 'Dashboard',       icon: 'fa-solid fa-gauge' },
+  { key: 'event',       label: 'Event RAT',        icon: 'fa-solid fa-calendar-days' },
+  { key: 'scanner',     label: 'Scan QR',          icon: 'fa-solid fa-qrcode' },
+  { key: 'attendance',  label: 'Data Kehadiran',   icon: 'fa-solid fa-list-check' },
+  { key: 'setting',     label: 'Pengaturan',       icon: 'fa-solid fa-gear' }
+];
+var PAGE_TITLES = { dashboard:'Dashboard', event:'Event RAT', scanner:'Scan QR', attendance:'Data Kehadiran', setting:'Pengaturan' };
+
+document.addEventListener('DOMContentLoaded', init);
+
+function init() {
+  bindLoginForm();
+  bindGlobalHandlers();
+
+  if (STATE.token) {
+    api('whoAmI', {}).then(function (res) {
+      if (res && res.success) {
+        STATE.user = res.user;
+        enterApp();
+      } else {
+        sessionStorage.removeItem('kp_token');
+        STATE.token = null;
+        showLogin();
+      }
+    }).catch(showLogin);
+  } else {
+    showLogin();
+  }
+}
+
+/* ---------------- Helpers ---------------- */
+
+function api(action, payload) {
+  payload = payload || {};
+  if (STATE.token) payload.token = STATE.token;
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: action, payload: payload }),
+    redirect: 'follow'
+  }).then(function (r) {
+    return r.json();
+  }).then(function (res) {
+    if (res && res.success === false && res.code === 'UNAUTHORIZED') {
+      handleSessionExpired();
+    }
+    return res;
+  });
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toast(icon, title) {
+  Swal.fire({ toast: true, position: 'top-end', icon: icon, title: title, showConfirmButton: false, timer: 2600, timerProgressBar: true });
+}
+
+function handleSessionExpired() {
+  sessionStorage.removeItem('kp_token');
+  STATE.token = null;
+  stopScanner();
+  Swal.fire({ icon: 'warning', title: 'Sesi berakhir', text: 'Silakan login kembali.' }).then(showLogin);
+}
+
+/* ---------------- Splash / Login / App shell switching ---------------- */
+
+function hideSplash() {
+  var el = document.getElementById('kp-splash');
+  if (el) el.classList.add('kp-hidden');
+}
+
+function showLogin() {
+  hideSplash();
+  document.getElementById('app-shell').classList.add('kp-hidden');
+  document.getElementById('login-shell').classList.remove('kp-hidden');
+}
+
+function enterApp() {
+  hideSplash();
+  document.getElementById('login-shell').classList.add('kp-hidden');
+  document.getElementById('app-shell').classList.remove('kp-hidden');
+
+  document.getElementById('kp-user-name').textContent = STATE.user.nama || STATE.user.username;
+  document.getElementById('kp-user-avatar').textContent = (STATE.user.nama || STATE.user.username || '?').charAt(0).toUpperCase();
+
+  renderNav();
+  applyRoleVisibility();
+  loadSettingsBadge();
+  navigateTo('dashboard');
+}
+
+function applyRoleVisibility() {
+  var isAdmin = STATE.user && STATE.user.role === 'Admin';
+  document.querySelectorAll('.kp-admin-only').forEach(function (el) {
+    el.classList.toggle('kp-hidden', !isAdmin);
+  });
+}
+
+/* ---------------- Navigation ---------------- */
+
+function renderNav() {
+  var html = NAV_ITEMS.map(function (item) {
+    return '<div class="kp-nav-item" data-page="' + item.key + '"><i class="' + item.icon + '"></i><span>' + item.label + '</span></div>';
+  }).join('') + '<div class="kp-nav-item logout" id="btn-logout-desktop"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></div>';
+
+  document.getElementById('kp-nav-desktop').innerHTML = html;
+  document.getElementById('kp-nav-mobile').innerHTML = html.replace('btn-logout-desktop', 'btn-logout-mobile');
+
+  document.querySelectorAll('.kp-nav-item[data-page]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      navigateTo(el.getAttribute('data-page'));
+      var oc = bootstrap.Offcanvas.getInstance(document.getElementById('kpOffcanvas'));
+      if (oc) oc.hide();
+    });
+  });
+  document.getElementById('btn-logout-desktop').addEventListener('click', doLogout);
+  document.getElementById('btn-logout-mobile').addEventListener('click', doLogout);
+}
+
+function navigateTo(pageKey) {
+  if (STATE.currentPage === 'scanner' && pageKey !== 'scanner') stopScanner();
+  if (STATE.currentPage === 'attendance' && pageKey !== 'attendance' && STATE.attendanceInterval) {
+    clearInterval(STATE.attendanceInterval);
+    STATE.attendanceInterval = null;
+  }
+
+  document.querySelectorAll('.kp-page').forEach(function (el) { el.classList.add('kp-hidden'); });
+  var target = document.getElementById('page-' + pageKey);
+  if (target) target.classList.remove('kp-hidden');
+
+  document.querySelectorAll('.kp-nav-item[data-page]').forEach(function (el) {
+    el.classList.toggle('active', el.getAttribute('data-page') === pageKey);
+  });
+  document.getElementById('kp-page-title').textContent = PAGE_TITLES[pageKey] || 'KOPANA';
+  STATE.currentPage = pageKey;
+
+  if (pageKey === 'dashboard') loadDashboard();
+  if (pageKey === 'event') loadEvents();
+  if (pageKey === 'scanner') initScannerPage();
+  if (pageKey === 'attendance') initAttendancePage();
+  if (pageKey === 'setting') loadSettingsForm();
+}
+
+function bindGlobalHandlers() {
+  document.querySelectorAll('.kp-quick-nav').forEach(function (el) {
+    el.addEventListener('click', function () { navigateTo(el.getAttribute('data-page')); });
+  });
+  bindEventPage();
+  bindScannerPage();
+  bindAttendancePage();
+  bindSettingsPage();
+}
+
+/* ---------------- Login ---------------- */
+
+function bindLoginForm() {
+  document.getElementById('btn-toggle-password').addEventListener('click', function () {
+    var input = document.getElementById('login-password');
+    var icon = this.querySelector('i');
+    if (input.type === 'password') { input.type = 'text'; icon.className = 'fa-regular fa-eye-slash'; }
+    else { input.type = 'password'; icon.className = 'fa-regular fa-eye'; }
+  });
+
+  document.getElementById('form-login').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var username = document.getElementById('login-username').value.trim();
+    var password = document.getElementById('login-password').value;
+    if (!username || !password) return;
+
+    setLoginLoading(true);
+    api('login', { username: username, password: password }).then(function (res) {
+      setLoginLoading(false);
+      if (res && res.success) {
+        STATE.token = res.token;
+        STATE.user = res.user;
+        sessionStorage.setItem('kp_token', res.token);
+        document.getElementById('form-login').reset();
+        enterApp();
+      } else {
+        Swal.fire({ icon: 'error', title: 'Gagal Masuk', text: (res && res.message) || 'Username atau password salah' });
+      }
+    }).catch(function () {
+      setLoginLoading(false);
+      Swal.fire({ icon: 'error', title: 'Koneksi Bermasalah', text: 'Tidak dapat menghubungi server' });
+    });
+  });
+}
+
+function setLoginLoading(loading) {
+  document.getElementById('btn-login').disabled = loading;
+  document.getElementById('btn-login-text').textContent = loading ? 'Memproses...' : 'Masuk';
+  document.getElementById('btn-login-spinner').classList.toggle('kp-hidden', !loading);
+}
+
+function doLogout() {
+  Swal.fire({
+    icon: 'question', title: 'Keluar dari aplikasi?', showCancelButton: true,
+    confirmButtonText: 'Ya, Logout', cancelButtonText: 'Batal', confirmButtonColor: '#DC2626'
+  }).then(function (result) {
+    if (!result.isConfirmed) return;
+    stopScanner();
+    api('logout', {}).then(finishLogout).catch(finishLogout);
+  });
+}
+
+function finishLogout() {
+  sessionStorage.removeItem('kp_token');
+  STATE.token = null;
+  STATE.user = null;
+  showLogin();
+}
+
+/* ---------------- Dashboard ---------------- */
+
+function loadDashboard() {
+  api('getDashboard', {}).then(function (res) {
+    if (!res || !res.success) return;
+    document.getElementById('dash-welcome-name').textContent = STATE.user.nama || STATE.user.username;
+    document.getElementById('stat-anggota-aktif').textContent = res.jumlahAnggotaAktif;
+    document.getElementById('stat-event-aktif').textContent = res.eventAktif || 'Belum ada';
+    document.getElementById('stat-hadir-hari-ini').textContent = res.jumlahHadirHariIni;
+    STATE.activeEventId = res.eventAktifId || null;
+  });
+}
+
+/* ---------------- Event RAT ---------------- */
+
+var eventModal;
+
+function bindEventPage() {
+  eventModal = new bootstrap.Modal(document.getElementById('modalEvent'));
+
+  document.getElementById('btn-open-add-event').addEventListener('click', function () {
+    document.getElementById('form-event').reset();
+    document.getElementById('event-id').value = '';
+    document.getElementById('modalEventTitle').textContent = 'Tambah Event RAT';
+    eventModal.show();
+  });
+
+  document.getElementById('form-event').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var eventId = document.getElementById('event-id').value;
+    var payload = {
+      namaEvent: document.getElementById('event-nama').value.trim(),
+      tanggal: document.getElementById('event-tanggal').value
+    };
+    var action = eventId ? 'updateEvent' : 'createEvent';
+    if (eventId) payload.eventId = eventId;
+
+    api(action, payload).then(function (res) {
+      if (res && res.success) {
+        toast('success', res.message);
+        eventModal.hide();
+        loadEvents();
+      } else {
+        Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || 'Terjadi kesalahan' });
+      }
+    });
+  });
+
+  document.getElementById('event-table-body').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    var eventId = btn.getAttribute('data-id');
+    var action = btn.getAttribute('data-action');
+
+    if (action === 'edit') {
+      api('getEvents', {}).then(function (res) {
+        var ev = (res.data || []).find(function (x) { return x.EventID === eventId; });
+        if (!ev) return;
+        document.getElementById('event-id').value = ev.EventID;
+        document.getElementById('event-nama').value = ev.NamaEvent;
+        document.getElementById('event-tanggal').value = formatDateForInput(ev.Tanggal);
+        document.getElementById('modalEventTitle').textContent = 'Edit Event RAT';
+        eventModal.show();
+      });
+    } else if (action === 'setActive') {
+      Swal.fire({ icon: 'question', title: 'Jadikan Event Aktif?', text: 'Event lain yang aktif akan diturunkan ke Draft.', showCancelButton: true, confirmButtonText: 'Ya' })
+        .then(function (r) {
+          if (!r.isConfirmed) return;
+          api('setActiveEvent', { eventId: eventId }).then(function (res) {
+            if (res.success) { toast('success', res.message); loadEvents(); } else Swal.fire('Gagal', res.message, 'error');
+          });
+        });
+    } else if (action === 'close') {
+      Swal.fire({ icon: 'warning', title: 'Tutup Event ini?', text: 'Event yang ditutup tidak bisa diaktifkan kembali.', showCancelButton: true, confirmButtonText: 'Ya, Tutup', confirmButtonColor: '#DC2626' })
+        .then(function (r) {
+          if (!r.isConfirmed) return;
+          api('closeEvent', { eventId: eventId }).then(function (res) {
+            if (res.success) { toast('success', res.message); loadEvents(); } else Swal.fire('Gagal', res.message, 'error');
+          });
+        });
+    }
+  });
+}
+
+function formatDateForInput(val) {
+  if (!val) return '';
+  var d = new Date(val);
+  if (isNaN(d.getTime())) return String(val).substring(0, 10);
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+function loadEvents() {
+  var isAdmin = STATE.user && STATE.user.role === 'Admin';
+  api('getEvents', {}).then(function (res) {
+    var tbody = document.getElementById('event-table-body');
+    var rows = (res && res.data) || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center kp-text-muted py-4">Belum ada Event RAT</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function (ev) {
+      var badgeClass = ev.Status === 'Aktif' ? 'kp-badge-aktif' : (ev.Status === 'Tutup' ? 'kp-badge-tutup' : 'kp-badge-draft');
+      var actions = '';
+      if (isAdmin) {
+        actions += '<button class="btn btn-sm btn-light me-1" data-action="edit" data-id="' + ev.EventID + '" title="Edit"><i class="fa-solid fa-pen"></i></button>';
+        if (ev.Status !== 'Aktif' && ev.Status !== 'Tutup') {
+          actions += '<button class="btn btn-sm btn-outline-success me-1" data-action="setActive" data-id="' + ev.EventID + '" title="Jadikan Aktif"><i class="fa-solid fa-circle-check"></i></button>';
+        }
+        if (ev.Status !== 'Tutup') {
+          actions += '<button class="btn btn-sm btn-outline-danger" data-action="close" data-id="' + ev.EventID + '" title="Tutup Event"><i class="fa-solid fa-lock"></i></button>';
+        }
+      }
+      return '<tr>' +
+        '<td class="kp-fw-700">' + escapeHtml(ev.NamaEvent) + '</td>' +
+        '<td>' + escapeHtml(formatDateForInput(ev.Tanggal)) + '</td>' +
+        '<td><span class="kp-badge ' + badgeClass + '">' + escapeHtml(ev.Status) + '</span></td>' +
+        '<td class="kp-admin-only">' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+    applyRoleVisibility();
+  });
+}
+
+/* ---------------- Scanner ---------------- */
+
+function bindScannerPage() {
+  document.getElementById('btn-toggle-camera').addEventListener('click', function () {
+    STATE.cameraFacing = STATE.cameraFacing === 'environment' ? 'user' : 'environment';
+    stopScanner(function () { startScanner(); });
+  });
+
+  // Input manual No Anggota (alur validasi sama persis dengan scan kamera)
+  document.getElementById('form-manual-scan').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('manual-no-anggota');
+    var noAnggota = input.value.trim();
+    if (!noAnggota) return;
+    var btn = document.getElementById('btn-manual-scan');
+    btn.disabled = true;
+    api('scanQr', { code: noAnggota }).then(function (res) {
+      renderScanResult(res);
+      playBeep(!!(res && res.success));
+      if (res && res.success) {
+        input.value = '';
+        loadDashboard();
+      }
+    }).catch(function () {
+      renderScanResult({ success: false, message: 'Koneksi bermasalah, coba lagi.' });
+      playBeep(false);
+    }).then(function () {
+      btn.disabled = false;
+      input.focus();
+    });
+  });
+}
+
+function initScannerPage() {
+  api('getDashboard', {}).then(function (res) {
+    STATE.activeEventId = res.eventAktifId || null;
+    var hasEvent = !!res.eventAktifId;
+    document.getElementById('scanner-no-event').classList.toggle('kp-hidden', hasEvent);
+    document.getElementById('scanner-active-wrap').classList.toggle('kp-hidden', !hasEvent);
+    document.getElementById('scan-result-box').innerHTML = '';
+    if (hasEvent) {
+      document.getElementById('scanner-event-name').textContent = res.eventAktif;
+      startScanner();
+    } else {
+      stopScanner();
+    }
+  });
+}
+
+function startScanner() {
+  if (STATE.scannerRunning) return;
+  var config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 };
+  if (!STATE.html5QrCode) STATE.html5QrCode = new Html5Qrcode('qr-reader');
+
+  // Di halaman top-level (GitHub Pages) facingMode bekerja normal.
+  STATE.html5QrCode.start({ facingMode: STATE.cameraFacing }, config, onScanSuccess, function () {})
+    .then(function () { STATE.scannerRunning = true; })
+    .catch(function () {
+      // Fallback: pilih kamera dari daftar eksplisit
+      Html5Qrcode.getCameras().then(function (cameras) {
+        if (!cameras || !cameras.length) throw new Error('Tidak ada kamera');
+        var chosen = cameras[0].id;
+        for (var i = 0; i < cameras.length; i++) {
+          var label = (cameras[i].label || '').toLowerCase();
+          if (label.indexOf('back') !== -1 || label.indexOf('rear') !== -1 || label.indexOf('belakang') !== -1) {
+            chosen = cameras[i].id; break;
+          }
+        }
+        return STATE.html5QrCode.start(chosen, config, onScanSuccess, function () {});
+      }).then(function () {
+        STATE.scannerRunning = true;
+      }).catch(function () {
+        var box = document.getElementById('scan-result-box');
+        box.innerHTML =
+          '<div class="kp-scan-result err">' +
+          '<i class="fa-solid fa-video-slash ic"></i>' +
+          '<div><div class="title">Kamera tidak tersedia</div>' +
+          '<div class="sub">Gunakan Input No Anggota di atas untuk mencatat kehadiran.</div></div>' +
+          '</div>';
+      });
+    });
+}
+
+function stopScanner(callback) {
+  if (STATE.html5QrCode && STATE.scannerRunning) {
+    STATE.html5QrCode.stop().then(function () {
+      STATE.scannerRunning = false;
+      if (callback) callback();
+    }).catch(function () {
+      STATE.scannerRunning = false;
+      if (callback) callback();
+    });
+  } else if (callback) {
+    callback();
+  }
+}
+
+function onScanSuccess(decodedText) {
+  if (STATE.scanLocked) return;
+  STATE.scanLocked = true;
+
+  api('scanQr', { code: decodedText }).then(function (res) {
+    renderScanResult(res);
+    playBeep(!!(res && res.success));
+    if (res && res.success) loadDashboard();
+  }).catch(function () {
+    renderScanResult({ success: false, message: 'Koneksi bermasalah, coba lagi.' });
+    playBeep(false);
+  }).then(function () {
+    setTimeout(function () { STATE.scanLocked = false; }, 2000);
+  });
+}
+
+function renderScanResult(res) {
+  var box = document.getElementById('scan-result-box');
+  if (res.success) {
+    box.innerHTML =
+      '<div class="kp-scan-result ok">' +
+      '<i class="fa-solid fa-circle-check ic"></i>' +
+      '<div><div class="title">' + escapeHtml(res.member.nama) + '</div>' +
+      '<div class="sub">No. ' + escapeHtml(res.member.noAnggota) + ' &middot; ' + escapeHtml(res.member.ranting) + ' &middot; ' + escapeHtml(res.member.jamHadir) + '</div></div>' +
+      '</div>';
+  } else {
+    var nama = (res.member && res.member.nama) ? escapeHtml(res.member.nama) : '';
+    box.innerHTML =
+      '<div class="kp-scan-result err">' +
+      '<i class="fa-solid fa-circle-xmark ic"></i>' +
+      '<div><div class="title">' + escapeHtml(res.message) + '</div>' +
+      (nama ? '<div class="sub">' + nama + '</div>' : '') +
+      '</div></div>';
+  }
+}
+
+function playBeep(success) {
+  try {
+    if (!STATE.audioCtx) STATE.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = STATE.audioCtx;
+    var vol = (STATE.settings.beepVolume !== undefined ? Number(STATE.settings.beepVolume) : 70) / 100;
+    beepOnce(ctx, success ? 1046.5 : 311, vol, success ? 0.12 : 0.25);
+    if (!success) setTimeout(function () { beepOnce(ctx, 311, vol, 0.25); }, 300);
+  } catch (e) { /* audio tidak tersedia */ }
+}
+
+function beepOnce(ctx, freq, vol, dur) {
+  var osc = ctx.createOscillator();
+  var gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.value = vol * 0.35;
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  osc.stop(ctx.currentTime + dur + 0.02);
+}
+
+/* ---------------- Data Kehadiran ---------------- */
+
+var attendanceSearchTimer;
+
+function bindAttendancePage() {
+  document.getElementById('attendance-search').addEventListener('keyup', function () {
+    clearTimeout(attendanceSearchTimer);
+    attendanceSearchTimer = setTimeout(loadAttendanceData, 350);
+  });
+  document.getElementById('attendance-filter-ranting').addEventListener('change', loadAttendanceData);
+  document.getElementById('btn-refresh-attendance').addEventListener('click', loadAttendanceData);
+  document.getElementById('btn-export-attendance').addEventListener('click', exportAttendanceExcel);
+  document.getElementById('btn-print-attendance').addEventListener('click', printAttendance);
+}
+
+function initAttendancePage() {
+  api('getRantingList', {}).then(function (res) {
+    var sel = document.getElementById('attendance-filter-ranting');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Semua Ranting</option>' +
+      (res.data || []).map(function (r) { return '<option value="' + escapeHtml(r) + '">' + escapeHtml(r) + '</option>'; }).join('');
+    sel.value = current;
+  });
+
+  api('getDashboard', {}).then(function (res) {
+    STATE.activeEventId = res.eventAktifId || null;
+    document.getElementById('print-event-name').textContent = res.eventAktif || '-';
+    loadAttendanceData();
+  });
+
+  if (STATE.attendanceInterval) clearInterval(STATE.attendanceInterval);
+  STATE.attendanceInterval = setInterval(loadAttendanceData, 8000);
+}
+
+var lastAttendanceRows = [];
+
+function loadAttendanceData() {
+  var keyword = document.getElementById('attendance-search').value.trim();
+  var ranting = document.getElementById('attendance-filter-ranting').value;
+
+  api('getAttendance', { eventId: STATE.activeEventId, keyword: keyword, ranting: ranting }).then(function (res) {
+    var tbody = document.getElementById('attendance-table-body');
+    var rows = (res && res.data) || [];
+    lastAttendanceRows = rows;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center kp-text-muted py-4">Belum ada data kehadiran</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + r.no + '</td>' +
+          '<td>' + escapeHtml(r.noAnggota) + '</td>' +
+          '<td class="kp-fw-700">' + escapeHtml(r.nama) + '</td>' +
+          '<td>' + escapeHtml(r.ranting) + '</td>' +
+          '<td>' + escapeHtml(r.jamHadir) + '</td>' +
+          '<td><span class="kp-badge kp-badge-aktif">' + escapeHtml(r.status) + '</span></td>' +
+          '</tr>';
+      }).join('');
+    }
+    document.getElementById('attendance-total-info').textContent = 'Total: ' + rows.length + ' hadir';
+  });
+}
+
+function exportAttendanceExcel() {
+  if (!lastAttendanceRows.length) { toast('info', 'Tidak ada data untuk diexport'); return; }
+  var data = lastAttendanceRows.map(function (r) {
+    return { No: r.no, 'No Anggota': r.noAnggota, Nama: r.nama, Ranting: r.ranting, 'Jam Hadir': r.jamHadir, Status: r.status };
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir');
+  XLSX.writeFile(wb, 'Daftar-Hadir-RAT-KOPANA.xlsx');
+}
+
+function printAttendance() {
+  var header = document.getElementById('print-header');
+  header.style.display = 'block';
+  window.print();
+  setTimeout(function () { header.style.display = 'none'; }, 500);
+}
+
+/* ---------------- Pengaturan ---------------- */
+
+function bindSettingsPage() {
+  document.getElementById('set-beep-volume').addEventListener('input', function () {
+    document.getElementById('beep-volume-label').textContent = this.value;
+    STATE.settings.beepVolume = this.value;
+  });
+  document.getElementById('btn-test-beep').addEventListener('click', function () { playBeep(true); });
+
+  document.getElementById('form-settings').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var settings = {
+      namaKoperasi: document.getElementById('set-nama-koperasi').value.trim(),
+      logoUrl: document.getElementById('set-logo-url').value.trim(),
+      scannerFacingMode: document.getElementById('set-scanner-facing').value,
+      beepVolume: document.getElementById('set-beep-volume').value
+    };
+    api('saveSettings', { settings: settings }).then(function (res) {
+      if (res && res.success) {
+        toast('success', res.message);
+        STATE.settings = res.data;
+        applySettingsToUI();
+      } else {
+        Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan', 'error');
+      }
+    });
+  });
+}
+
+function loadSettingsForm() {
+  api('getSettings', {}).then(function (res) {
+    if (!res || !res.success) return;
+    STATE.settings = res.data;
+    document.getElementById('set-nama-koperasi').value = STATE.settings.namaKoperasi || '';
+    document.getElementById('set-logo-url').value = STATE.settings.logoUrl || '';
+    document.getElementById('set-scanner-facing').value = STATE.settings.scannerFacingMode || 'environment';
+    document.getElementById('set-beep-volume').value = STATE.settings.beepVolume || 70;
+    document.getElementById('beep-volume-label').textContent = STATE.settings.beepVolume || 70;
+    STATE.cameraFacing = STATE.settings.scannerFacingMode || 'environment';
+    applySettingsToUI();
+  });
+}
+
+function loadSettingsBadge() {
+  api('getSettings', {}).then(function (res) {
+    if (!res || !res.success) return;
+    STATE.settings = res.data;
+    STATE.cameraFacing = STATE.settings.scannerFacingMode || 'environment';
+    applySettingsToUI();
+  });
+}
+
+function applySettingsToUI() {
+  if (STATE.settings.namaKoperasi) {
+    document.getElementById('kp-brand-name').textContent = STATE.settings.namaKoperasi;
+  }
+}
+  </script>
+</body>
+</html>
