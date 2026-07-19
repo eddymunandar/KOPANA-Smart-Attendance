@@ -1214,7 +1214,6 @@ function exportAttendanceExcel() {
   var tanggalExport = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear() +
     ' ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
 
-  // Susun isi sheet: judul di atas, lalu tabel
   var aoa = [
     ['DAFTAR HADIR RAPAT ANGGOTA TAHUNAN'],
     [namaKoperasi],
@@ -1231,7 +1230,6 @@ function exportAttendanceExcel() {
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Gabungkan sel judul agar rapi melebar 6 kolom
   ws['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
@@ -1239,25 +1237,15 @@ function exportAttendanceExcel() {
     { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }
   ];
 
-  // Lebar kolom
   ws['!cols'] = [
-    { wch: 5 },   // No
-    { wch: 12 },  // No Anggota
-    { wch: 30 },  // Nama
-    { wch: 15 },  // Ranting
-    { wch: 20 },  // Jam Hadir
-    { wch: 10 }   // Status
+    { wch: 5 },
+    { wch: 12 },
+    { wch: 30 },
+    { wch: 15 },
+    { wch: 20 },
+    { wch: 10 }
   ];
 
-  var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir');
-  XLSX.writeFile(wb, 'Daftar-Hadir-RAT-KOPANA.xlsx');
-}
-  if (!lastAttendanceRows.length) { toast('info', 'Tidak ada data untuk diexport'); return; }
-  var data = lastAttendanceRows.map(function (r) {
-    return { No: r.no, 'No Anggota': r.noAnggota, Nama: r.nama, Ranting: r.ranting, 'Jam Hadir': r.jamHadir, Status: r.status };
-  });
-  var ws = XLSX.utils.json_to_sheet(data);
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir');
   XLSX.writeFile(wb, 'Daftar-Hadir-RAT-KOPANA.xlsx');
@@ -1269,7 +1257,6 @@ function printAttendance() {
   window.print();
   setTimeout(function () { header.style.display = 'none'; }, 500);
 }
-
 /* ---------------- Pengaturan ---------------- */
 
 function bindSettingsPage() {
