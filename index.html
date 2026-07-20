@@ -261,7 +261,7 @@
 <div id="login-shell" class="kp-hidden">
   <div class="kp-login-card">
     <div class="kp-login-mark kp-logo-target"><i class="fa-solid fa-clipboard-check"></i></div>
-    <h1>KOPANA</h1>
+    <h1 id="kp-login-title">KOPANA</h1>
     <div class="kp-sub">Smart Attendance &middot; Rapat Anggota Tahunan</div>
 
     <form id="form-login" autocomplete="off">
@@ -699,6 +699,10 @@ function init() {
     return;
   }
 
+  // Ambil pengaturan tampilan (logo & nama koperasi) tanpa perlu login,
+  // agar halaman Login sudah menampilkan identitas koperasi.
+  loadPublicBranding();
+
   if (STATE.token) {
     api('whoAmI', {}).then(function (res) {
       if (res && res.success) {
@@ -733,6 +737,19 @@ function api(action, payload) {
     }
     return res;
   });
+}
+
+function loadPublicBranding() {
+  api('getPublicSettings', {}).then(function (res) {
+    if (!res || !res.success || !res.data) return;
+    STATE.settings.namaKoperasi = res.data.namaKoperasi || STATE.settings.namaKoperasi;
+    STATE.settings.logoUrl = res.data.logoUrl || STATE.settings.logoUrl;
+
+    var judul = document.getElementById('kp-login-title');
+    if (judul && STATE.settings.namaKoperasi) judul.textContent = STATE.settings.namaKoperasi;
+
+    applySettingsToUI();
+  }).catch(function () { /* abaikan, pakai tampilan bawaan */ });
 }
 
 function escapeHtml(str) {
@@ -1502,7 +1519,10 @@ function loadSettingsBadge() {
 
 function applySettingsToUI() {
   if (STATE.settings.namaKoperasi) {
-    document.getElementById('kp-brand-name').textContent = STATE.settings.namaKoperasi;
+    var brand = document.getElementById('kp-brand-name');
+    if (brand) brand.textContent = STATE.settings.namaKoperasi;
+    var judul = document.getElementById('kp-login-title');
+    if (judul) judul.textContent = STATE.settings.namaKoperasi;
   }
   applyLogo_();
 }
