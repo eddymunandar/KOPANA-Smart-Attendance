@@ -15,50 +15,52 @@ Apps Script Web App (doPost → Router → Service)
 Google Sheets (database)
 ```
 
-- **Frontend**: satu file `index.html` (HTML + CSS + JS jadi satu), di-hosting GitHub Pages. Berjalan sebagai halaman top-level sehingga **kamera HP bisa diakses** (di dalam iframe Apps Script, kamera diblokir browser — inilah alasan arsitektur ini dipakai).
-- **Backend**: Google Apps Script sebagai API JSON murni. File sumbernya diarsipkan di folder `backend/`.
-- **Database**: Google Sheets dengan 6 sheet (lihat struktur di bawah).
+- **Frontend**: satu file `index.html` (HTML + CSS + JS jadi satu), di-hosting GitHub Pages. Berjalan sebagai halaman top-level sehingga **kamera HP bisa diakses** — di dalam iframe Apps Script kamera diblokir browser (iPhone & sebagian Android). Inilah alasan arsitektur ini dipakai.
+- **Backend**: Google Apps Script sebagai API JSON murni (`doPost`). Kode sumbernya ada di folder `backend/`, dikelola dengan `clasp`.
+- **Database**: Google Sheets, 6 sheet (struktur di bawah).
 - **Login**: token session — dibuat saat login, disimpan di `sessionStorage` (browser) dan `CacheService` (server, kedaluwarsa 6 jam). Password disimpan sebagai hash SHA-256.
 
 ## Struktur Repo
 
 ```
-index.html      Frontend lengkap (yang disajikan GitHub Pages)
-logo.png        Logo koperasi (opsional, dipakai lewat menu Pengaturan)
-backend/        Arsip file Apps Script (.gs) — sumber kebenaran kode backend
-README.md       Dokumen ini
+index.html          Frontend lengkap (yang disajikan GitHub Pages)
+logo.png            Logo koperasi (opsional, dipakai lewat menu Pengaturan)
+backend/            Kode Apps Script (hasil clasp clone)
+  ├── *.js          File kode — di Apps Script bernama .gs
+  └── appsscript.json
+README.md           Dokumen ini
+.gitignore          Mengecualikan .clasp.json & node_modules
 ```
 
-> **Penting:** Apps Script TIDAK membaca folder `backend/` secara otomatis.
-> Perubahan pada file `.gs` harus disalin manual ke Apps Script Editor,
-> lalu **Deploy → Manage deployments → edit → New version → Deploy**.
-> Perubahan `index.html` otomatis live 1–2 menit setelah merge ke `main`
-> (GitHub Pages rebuild otomatis; gunakan `?v=angka` untuk melewati cache
-> saat mengecek hasil).
+> **Catatan penamaan:** `clasp` mengunduh file Apps Script `.gs` menjadi **`.js`**
+> di lokal (agar dikenali editor), dan mengunggahnya kembali sebagai `.gs`.
+> Jadi `backend/Code.js` di repo = `Code.gs` di Apps Script Editor. Ini normal —
+> jangan di-rename.
 
 ## Struktur File Backend (folder `backend/`)
 
 | File | Isi |
 |---|---|
-| `Code.gs` | `doPost` (pintu masuk API JSON), `doGet` (status), `util_generatePasswordHash` |
-| `01_Config.gs` | Konfigurasi: SPREADSHEET_ID, nama sheet, durasi session |
-| `02_Constants.gs` | Konstanta role, status, pesan |
-| `03_Database.gs` | Layer generik baca/tulis Google Sheets (semua akses sheet lewat sini) |
-| `04_Utils.gs` | ID generator, format tanggal, hash SHA-256, session (CacheService) |
-| `05_ErrorHandler.gs` | AppError + penanganan error terpusat |
-| `06_Logger.gs` | Tulis aktivitas ke sheet LOGS |
-| `07_Router.gs` | Dispatcher semua aksi API + cek otorisasi per aksi |
-| `08_Api.gs` | (tidak dipakai lagi di arsitektur API — pintu masuk kini `doPost` di Code.gs) |
-| `09_UserRepository.gs` | Akses sheet USERS |
-| `10_AuthService.gs` | Login / Logout / whoAmI |
-| `11_DashboardService.gs` | Statistik dashboard |
-| `12_EventService.gs` | Kelola Event RAT (satu event Aktif pada satu waktu) |
-| `13_AttendanceService.gs` | Scan QR: ekstraksi No Anggota dari QR multi-baris, validasi, simpan kehadiran |
-| `appsscript.json` | Manifest (akses web app: ANYONE_ANONYMOUS — wajib agar frontend eksternal bisa memanggil API) |
+| `Code.js` | `doPost` (pintu masuk API JSON), `doGet` (status), `util_generatePasswordHash` |
+| `01_Config.js` | Konfigurasi: SPREADSHEET_ID, nama sheet, durasi session |
+| `02_Constants.js` | Konstanta role, status, pesan |
+| `03_Database.js` | Layer generik baca/tulis Google Sheets (semua akses sheet lewat sini) |
+| `04_Utils.js` | ID generator, format tanggal, hash SHA-256, session (CacheService) |
+| `05_ErrorHandler.js` | AppError + penanganan error terpusat |
+| `06_Logger.js` | Tulis aktivitas ke sheet LOGS |
+| `07_Router.js` | Dispatcher semua aksi API + cek otorisasi per aksi |
+| `08_Api.js` | Sisa arsitektur lama (pintu masuk kini `doPost` di Code.js) |
+| `09_UserRepository.js` | Akses sheet USERS |
+| `10_AuthService.js` | Login / Logout / whoAmI |
+| `11_DashboardService.js` | Statistik dashboard |
+| `12_EventService.js` | Kelola Event RAT (satu event Aktif pada satu waktu) |
+| `13_AttendanceService.js` | Scan QR: ekstraksi No Anggota dari QR multi-baris, validasi, simpan kehadiran |
+| `appsscript.json` | Manifest. Akses web app: `ANYONE_ANONYMOUS` — wajib agar frontend eksternal bisa memanggil API |
 
 ## Struktur Google Sheets (nama tab & header WAJIB persis)
 
 **MEMBER** — data anggota (hanya dibaca aplikasi; tidak ada CRUD anggota)
+
 | No Anggota | Nama | Alamat | Telepon | Ranting | Status |
 |---|---|---|---|---|---|
 
@@ -66,29 +68,34 @@ Nilai `Status`: `Aktif` atau `Non Aktif` (persis, huruf besar hanya di awal kata
 Hanya anggota `Aktif` yang bisa absen.
 
 **EVENT** — diisi lewat aplikasi
+
 | EventID | NamaEvent | Tanggal | Status | CreatedBy | CreatedAt |
 |---|---|---|---|---|---|
 
 Status event: `Draft` / `Aktif` / `Tutup`. Hanya satu event `Aktif` pada satu waktu.
 
 **ATTENDANCE** — diisi otomatis saat scan
+
 | EventID | No Anggota | Nama | Ranting | JamHadir | Status | ScannedBy |
 |---|---|---|---|---|---|---|
 
 **USERS** — akun login
+
 | Username | Password | Nama | Role | Status |
 |---|---|---|---|---|
 
-- `Password`: hash SHA-256 (bukan teks biasa) — buat dengan menjalankan `util_generatePasswordHash` di Apps Script Editor.
+- `Password`: hash SHA-256, bukan teks biasa. Buat dengan menjalankan `util_generatePasswordHash` di Apps Script Editor (ubah dulu nilai `plainPassword` di dalamnya), lalu salin hash dari Execution Log.
 - `Role`: `Admin` atau `Petugas`. `Status`: `Aktif` atau `Non Aktif`.
 
 **SETTINGS** — key-value, dikelola lewat menu Pengaturan
+
 | Key | Value |
 |---|---|
 
 Key yang dipakai: `namaKoperasi`, `logoUrl`, `scannerFacingMode`, `beepVolume`.
 
 **LOGS** — diisi otomatis (login, logout, scan, kelola event, simpan pengaturan)
+
 | Timestamp | Username | Aktivitas | Detail |
 |---|---|---|---|
 
@@ -103,10 +110,10 @@ Ranting: ...
 Status: ...
 ```
 
-Backend (`13_AttendanceService.gs` → `extractNoAnggota_`) mengekstrak nilai
+Backend (`13_AttendanceService.js` → `extractNoAnggota_`) mengekstrak nilai
 setelah label `No. Anggota:`. **Status di QR diabaikan** — yang berlaku selalu
-status terkini di sheet MEMBER. Input manual berupa nomor langsung juga diterima
-(alur validasi sama).
+status terkini di sheet MEMBER, sehingga kartu lama tetap valid. Input manual
+berupa nomor langsung juga diterima (alur validasi sama).
 
 ## Alur Scan
 
@@ -122,17 +129,34 @@ QR terbaca / input manual
 
 ## Cara Update
 
-**Frontend (`index.html`):**
-1. Buat perubahan lewat PR (edit di GitHub / Claude Code) → review → **Merge**.
-2. GitHub Pages rebuild otomatis (1–2 menit). Cek dengan `?v=angka` di URL untuk melewati cache (cache Pages ±10 menit).
+### Frontend (`index.html`)
 
-**Backend (`backend/*.gs`):**
-1. Merge perubahan di repo (arsip).
-2. Salin isi file yang berubah ke Apps Script Editor → Save.
-3. **Deploy → Manage deployments → ikon pensil → Version: New version → Deploy.**
-   (Tanpa "New version", web app tetap menjalankan kode lama.)
-4. Pengaturan deployment: Execute as **Me**, Who has access **Anyone**.
-5. Jika URL `/exec` berubah (deployment baru, bukan versi baru), perbarui konstanta `API_URL` di `index.html`.
+1. Buat perubahan lewat PR (edit di GitHub / Claude Code) → review → **Merge** ke `main`.
+2. GitHub Pages rebuild otomatis, live dalam 1–2 menit. Tidak ada langkah manual lain.
+3. Saat mengecek hasil, tambahkan `?v=angka` di URL untuk melewati cache
+   (cache GitHub Pages ±10 menit), contoh:
+   `https://eddymunandar.github.io/KOPANA-Smart-Attendance/?v=12`
+
+### Backend (`backend/*.js`) — via clasp
+
+Prasyarat sekali saja: `npm install -g @google/clasp` lalu `clasp login`.
+
+```bash
+git pull                 # ambil perubahan hasil merge PR
+cd backend
+clasp push               # kirim kode ke Apps Script
+clasp deploy             # buat versi deployment baru
+```
+
+Alternatif tanpa clasp: salin isi file yang berubah ke Apps Script Editor → Save →
+**Deploy → Manage deployments → ikon pensil → Version: New version → Deploy.**
+
+> Tanpa membuat **versi baru**, web app tetap menjalankan kode lama walaupun
+> kodenya sudah tersimpan. Ini sumber kebingungan yang paling sering terjadi.
+
+Pengaturan deployment yang benar: Execute as **Me**, Who has access **Anyone**.
+Jika URL `/exec` berubah (membuat deployment baru, bukan versi baru), perbarui
+konstanta `API_URL` di `index.html`.
 
 ## Konfigurasi Frontend
 
@@ -146,13 +170,25 @@ Harus menunjuk ke URL Web App Apps Script yang aktif.
 
 ## Catatan Teknis & Jebakan yang Pernah Terjadi
 
-- **`google.script.run` tidak bisa mengirim objek Date** → semua respons di-serialize `JSON.parse(JSON.stringify(...))` di `doPost` sebelum dikirim. Jangan dihapus.
-- **Nama tab & header sheet case-sensitive** — `ATTENDANCE` bukan `ATTENDACE`, `Username` bukan `USERNAME`. Salah satu huruf pun membuat data "tidak ditemukan".
-- **Kolom No Anggota di sheet** sebaiknya berformat **Plain text** agar nol di depan tidak hilang.
-- **Kamera di iframe Apps Script diblokir** (iPhone & sebagian Android) — itulah alasan frontend dipindah ke GitHub Pages. Jangan kembali menyajikan frontend lewat `HtmlService`.
-- **Scanner**: pakai `html5-qrcode`, qrbox 80% viewfinder + resolusi ideal 1280×720 (QR multi-baris butuh resolusi cukup). Continuous scan dengan jeda kunci 2 detik antar-scan.
-- **Export Excel** dibuat di browser (SheetJS) dengan judul laporan; **Cetak** memakai `window.print()` + CSS `@media print`.
+- **Objek Date tidak bisa dikirim langsung ke browser** lewat mekanisme Apps Script —
+  respons berubah jadi `null`. Karena itu `doPost` melakukan
+  `JSON.parse(JSON.stringify(result))` sebelum mengirim. Jangan dihapus.
+- **Nama tab & header sheet bersifat case-sensitive** — `ATTENDANCE` bukan `ATTENDACE`,
+  `Username` bukan `USERNAME`. Beda satu huruf saja membuat data "tidak ditemukan"
+  atau memunculkan error `appendRow() must not be empty`.
+- **Kolom No Anggota** sebaiknya diformat **Plain text** di Sheets agar nol di depan
+  (mis. `001234`) tidak hilang.
+- **Jangan kembalikan frontend ke `HtmlService`** — kamera akan terblokir lagi karena
+  halaman disajikan di dalam iframe.
+- **Scanner**: `html5-qrcode`, qrbox 80% viewfinder + resolusi ideal 1280×720.
+  QR multi-baris cukup padat sehingga butuh area & resolusi memadai; dengan setelan
+  kotak kecil default QR tidak terbaca. Continuous scan dengan jeda kunci 2 detik.
+- **Export Excel** dibuat di sisi browser (SheetJS) lengkap dengan judul laporan;
+  **Cetak** memakai `window.print()` + CSS `@media print`. SheetJS versi gratis tidak
+  mendukung format tebal/besar, jadi judul tampil sebagai teks biasa.
+- **Input manual No Anggota** tersedia di halaman Scan QR sebagai cadangan bila QR
+  rusak/buram atau kamera bermasalah — melewati alur validasi yang sama persis.
 
 ## Kapasitas
 
-Dirancang untuk ±250 anggota, 4 ranting, ±3 petugas scan bersamaan.
+Dirancang untuk ±250 anggota, 4 ranting, ±3 petugas melakukan scan bersamaan.
