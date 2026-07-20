@@ -15,6 +15,6 @@
  */
 
 var KOPANA_CONFIG = {
-  API_URL: 'PASTE_URL_WEB_APP_APPS_SCRIPT_DISINI'
+  API_URL: 'https://script.google.com/macros/s/AKfycbwJiiLGcVlXWf3xELIcWTSoNtYSyGmbF4iQwxahWtxuV2Gpds0sKFzr_jl8Gm1tqa4c/exec'
 };
 mu
