@@ -52,6 +52,14 @@ var Router = (function () {
           var u5 = Utils.requireAuth(payload.token);
           return AttendanceService.scanQr(payload, u5);
         }
+        case 'recordGuest': {
+          var u7 = Utils.requireAuth(payload.token);
+          return AttendanceService.recordGuest(payload, u7);
+        }
+        case 'markTransport': {
+          var u8 = Utils.requireAuth(payload.token);
+          return AttendanceService.markTransport(payload, u8);
+        }
         case 'getAttendance':
           Utils.requireAuth(payload.token);
           return AttendanceService.getAttendance(payload);

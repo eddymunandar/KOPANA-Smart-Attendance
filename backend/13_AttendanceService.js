@@ -1,7 +1,7 @@
 /**
  * =========================================================
  * 13_AttendanceService.gs
- * Proses scan QR dan pengambilan data kehadiran.
+ * Proses scan QR, pencatatan tamu, dan pengambilan data kehadiran.
  * Kolom ATTENDANCE: EventID | No Anggota | Nama | Ranting | JamHadir | Status | ScannedBy
  *
  * QR kartu anggota berisi teks multi-baris:
@@ -12,10 +12,17 @@
  * Fungsi extractNoAnggota_ mengambil nomor anggotanya saja.
  * Status di QR DIABAIKAN - yang dipakai selalu status terkini
  * di Sheet MEMBER.
+ *
+ * TAMU UNDANGAN dicatat lewat recordGuest() dengan:
+ *   No Anggota = 'TAMU', Status = 'Tamu'
+ * sehingga tidak ikut terhitung sebagai anggota hadir (kuorum).
  * =========================================================
  */
 
 var AttendanceService = (function () {
+
+  var STATUS_TAMU = 'Tamu';
+  var KODE_TAMU = 'TAMU';
 
   /**
    * Mengambil No Anggota dari isi QR.
@@ -27,20 +34,15 @@ var AttendanceService = (function () {
     var text = String(rawText || '').trim();
     if (!text) return '';
 
-    // Cari pola "No. Anggota" / "No Anggota" (fleksibel terhadap titik,
-    // spasi, dan huruf besar/kecil), ambil nilai setelah tanda ':'
     var match = text.match(/no\.?\s*anggota\s*:?\s*([^\r\n]+)/i);
     if (match && match[1]) {
       return match[1].trim();
     }
-
-    // Bukan format kartu: anggap input manual berisi nomor langsung.
-    // Ambil baris pertama saja untuk berjaga-jaga.
     return text.split(/[\r\n]+/)[0].trim();
   }
 
   /**
-   * Alur:
+   * Alur scan anggota:
    * QR terbaca -> Ekstrak No Anggota -> Cari MEMBER -> Cek Status Aktif
    * -> Cek Event Aktif -> Cek sudah hadir -> Simpan ATTENDANCE
    */
@@ -78,7 +80,7 @@ var AttendanceService = (function () {
     }
 
     var jamHadir = new Date();
-    Database.insert(CONFIG.SHEET.ATTENDANCE, {
+    var barisBaru = Database.insert(CONFIG.SHEET.ATTENDANCE, {
       EventID: activeEvent.EventID,
       'No Anggota': member['No Anggota'],
       Nama: member.Nama,
@@ -95,6 +97,7 @@ var AttendanceService = (function () {
       code: 'OK',
       message: MESSAGES.SCAN_SUCCESS,
       member: {
+        row: barisBaru,
         noAnggota: member['No Anggota'],
         nama: member.Nama,
         ranting: member.Ranting,
@@ -104,7 +107,67 @@ var AttendanceService = (function () {
   }
 
   /**
+   * Mencatat kehadiran TAMU UNDANGAN (bukan anggota koperasi).
+   * Disimpan dengan Status 'Tamu' agar tidak terhitung dalam kuorum anggota.
+   */
+  function recordGuest(payload, actingUser) {
+    var nama = String(payload.nama || '').trim();
+    var instansi = String(payload.instansi || '').trim();
+
+    if (!nama) {
+      return { success: false, code: 'INVALID', message: 'Nama tamu wajib diisi' };
+    }
+
+    var activeEvent = EventService.getActiveEvent();
+    if (!activeEvent) {
+      return { success: false, code: 'NO_EVENT', message: MESSAGES.NO_ACTIVE_EVENT };
+    }
+
+    // Cegah pencatatan ganda untuk nama tamu yang sama pada event yang sama
+    var guests = Database.findWhere(CONFIG.SHEET.ATTENDANCE, {
+      EventID: activeEvent.EventID,
+      Status: STATUS_TAMU
+    });
+    for (var i = 0; i < guests.length; i++) {
+      if (String(guests[i].Nama).trim().toLowerCase() === nama.toLowerCase()) {
+        return {
+          success: false,
+          code: 'ALREADY',
+          message: 'Tamu dengan nama ini sudah tercatat',
+          member: { nama: nama, jamHadir: guests[i].JamHadir }
+        };
+      }
+    }
+
+    var jamHadir = new Date();
+    Database.insert(CONFIG.SHEET.ATTENDANCE, {
+      EventID: activeEvent.EventID,
+      'No Anggota': KODE_TAMU,
+      Nama: nama,
+      Ranting: instansi || '-',
+      JamHadir: jamHadir,
+      Status: STATUS_TAMU,
+      ScannedBy: actingUser.username
+    });
+
+    ActivityLogger.log(actingUser.username, 'Catat Tamu', nama + (instansi ? ' - ' + instansi : ''));
+
+    return {
+      success: true,
+      code: 'OK',
+      message: 'Tamu berhasil dicatat',
+      member: {
+        noAnggota: KODE_TAMU,
+        nama: nama,
+        ranting: instansi || '-',
+        jamHadir: Utils.formatDateTime(jamHadir)
+      }
+    };
+  }
+
+  /**
    * Mengambil data kehadiran untuk sebuah event, dengan opsi pencarian & filter ranting.
+   * Mengembalikan juga rincian jumlah anggota dan tamu.
    */
   function getAttendance(payload) {
     var eventId = payload.eventId;
@@ -127,22 +190,127 @@ var AttendanceService = (function () {
       return new Date(b.JamHadir) - new Date(a.JamHadir);
     });
 
+    var totalAnggota = 0;
+    var totalTamu = 0;
+    rows.forEach(function (r) {
+      if (String(r.Status) === STATUS_TAMU) totalTamu++;
+      else totalAnggota++;
+    });
+
+    var totalTransport = 0;
     var data = rows.map(function (r, idx) {
+      var sudahTransport = String(r.Transport || '').trim().toLowerCase() === 'sudah';
+      if (sudahTransport) totalTransport++;
       return {
         no: idx + 1,
+        row: r.__row,
         noAnggota: r['No Anggota'],
         nama: r.Nama,
         ranting: r.Ranting,
         jamHadir: Utils.formatDateTime(r.JamHadir),
-        status: r.Status
+        status: r.Status,
+        transport: sudahTransport ? 'Sudah' : '',
+        transportJam: r.TransportJam ? Utils.formatDateTime(r.TransportJam) : '',
+        transportOleh: r.TransportOleh || ''
       };
     });
 
-    return { success: true, data: data, total: data.length };
+    return {
+      success: true,
+      data: data,
+      total: data.length,
+      totalAnggota: totalAnggota,
+      totalTamu: totalTamu,
+      totalTransport: totalTransport
+    };
+  }
+
+  /**
+   * Menandai bahwa uang transport sudah diserahkan kepada seseorang
+   * yang tercatat hadir. Menyimpan jejak audit: jam penyerahan dan
+   * petugas yang menyerahkan.
+   *
+   * payload.row    = nomor baris di sheet ATTENDANCE (dari getAttendance)
+   * payload.cancel = true untuk membatalkan (khusus Admin)
+   */
+  function markTransport(payload, actingUser) {
+    var rowNumber = parseInt(payload.row, 10);
+    if (!rowNumber) {
+      return { success: false, code: 'INVALID', message: 'Data kehadiran tidak valid' };
+    }
+
+    var activeEvent = EventService.getActiveEvent();
+    if (!activeEvent) {
+      return { success: false, code: 'NO_EVENT', message: MESSAGES.NO_ACTIVE_EVENT };
+    }
+
+    // Ambil baris terkait dan pastikan memang milik event yang aktif
+    var all = Database.getAll(CONFIG.SHEET.ATTENDANCE);
+    var target = null;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].__row === rowNumber) { target = all[i]; break; }
+    }
+    if (!target) {
+      return { success: false, code: 'NOT_FOUND', message: 'Data kehadiran tidak ditemukan' };
+    }
+    if (String(target.EventID) !== String(activeEvent.EventID)) {
+      return { success: false, code: 'INVALID', message: 'Data ini bukan milik Event yang aktif' };
+    }
+
+    var sudah = String(target.Transport || '').trim().toLowerCase() === 'sudah';
+
+    // Pembatalan hanya boleh Admin (menyangkut penyerahan uang)
+    if (payload.cancel) {
+      if (actingUser.role !== ROLES.ADMIN) {
+        return { success: false, code: 'FORBIDDEN', message: 'Pembatalan hanya dapat dilakukan Admin' };
+      }
+      if (!sudah) {
+        return { success: false, code: 'INVALID', message: 'Transport belum ditandai diserahkan' };
+      }
+      Database.updateByRow(CONFIG.SHEET.ATTENDANCE, rowNumber, {
+        Transport: '',
+        TransportJam: '',
+        TransportOleh: ''
+      });
+      ActivityLogger.log(actingUser.username, 'Batal Transport', target['No Anggota'] + ' - ' + target.Nama);
+      return { success: true, message: 'Penyerahan transport dibatalkan' };
+    }
+
+    if (sudah) {
+      return {
+        success: false,
+        code: 'ALREADY',
+        message: 'Transport sudah diserahkan sebelumnya',
+        member: { nama: target.Nama, jamHadir: target.TransportJam }
+      };
+    }
+
+    var jam = new Date();
+    Database.updateByRow(CONFIG.SHEET.ATTENDANCE, rowNumber, {
+      Transport: 'Sudah',
+      TransportJam: jam,
+      TransportOleh: actingUser.username
+    });
+
+    ActivityLogger.log(actingUser.username, 'Serah Transport', target['No Anggota'] + ' - ' + target.Nama);
+
+    return {
+      success: true,
+      code: 'OK',
+      message: 'Transport diserahkan',
+      member: {
+        noAnggota: target['No Anggota'],
+        nama: target.Nama,
+        ranting: target.Ranting,
+        jamHadir: Utils.formatDateTime(jam)
+      }
+    };
   }
 
   return {
     scanQr: scanQr,
+    recordGuest: recordGuest,
+    markTransport: markTransport,
     getAttendance: getAttendance
   };
 })();
