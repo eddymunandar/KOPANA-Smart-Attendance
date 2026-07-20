@@ -480,6 +480,29 @@
         </form>
       </div>
 
+      <!-- Catat Tamu Undangan (bukan anggota koperasi) -->
+      <div class="kp-card mb-3" style="padding:14px 16px;">
+        <div class="kp-fw-700 mb-2" style="font-size:.85rem;"><i class="fa-solid fa-user-tie kp-text-muted me-1"></i> Catat Tamu Undangan</div>
+        <form id="form-guest">
+          <div class="row g-2">
+            <div class="col-12">
+              <input type="text" class="form-control" id="guest-nama" placeholder="Nama tamu" autocomplete="off">
+            </div>
+            <div class="col-12">
+              <div class="input-group">
+                <input type="text" class="form-control" id="guest-instansi" placeholder="Instansi / jabatan (opsional)" autocomplete="off">
+                <button class="btn kp-btn-gold" type="submit" id="btn-guest-save">
+                  <i class="fa-solid fa-user-plus"></i> Catat
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+        <div class="kp-text-muted mt-2" style="font-size:.75rem;">
+          Tamu tidak dihitung sebagai anggota hadir (kuorum).
+        </div>
+      </div>
+
       <div class="kp-scan-frame">
         <div id="qr-reader"></div>
         <div class="kp-scan-corner tl"></div>
@@ -629,7 +652,7 @@
    PENTING: Ganti nilai API_URL di bawah dengan URL Web App
    Apps Script Anda (yang berakhiran /exec).
    ============================================================ */
-var API_URL = 'https://script.google.com/macros/s/AKfycbwJiiLGcVlXWf3xELIcWTSoNtYSyGmbF4iQwxahWtxuV2Gpds0sKFzr_jl8Gm1tqa4c/exec';
+var API_URL = 'PASTE_URL_WEB_APP_APPS_SCRIPT_DISINI';
 
 var STATE = {
   token: sessionStorage.getItem('kp_token') || null,
@@ -1018,6 +1041,32 @@ function bindScannerPage() {
       input.focus();
     });
   });
+
+  // Catat tamu undangan
+  document.getElementById('form-guest').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var namaEl = document.getElementById('guest-nama');
+    var instansiEl = document.getElementById('guest-instansi');
+    var nama = namaEl.value.trim();
+    if (!nama) { toast('info', 'Nama tamu wajib diisi'); namaEl.focus(); return; }
+    var btn = document.getElementById('btn-guest-save');
+    btn.disabled = true;
+    api('recordGuest', { nama: nama, instansi: instansiEl.value.trim() }).then(function (res) {
+      renderScanResult(res);
+      playBeep(!!(res && res.success));
+      if (res && res.success) {
+        namaEl.value = '';
+        instansiEl.value = '';
+        loadDashboard();
+      }
+    }).catch(function () {
+      renderScanResult({ success: false, message: 'Koneksi bermasalah, coba lagi.' });
+      playBeep(false);
+    }).then(function () {
+      btn.disabled = false;
+      namaEl.focus();
+    });
+  });
 }
 
 function initScannerPage() {
@@ -1201,17 +1250,21 @@ function loadAttendanceData() {
       tbody.innerHTML = '<tr><td colspan="6" class="text-center kp-text-muted py-4">Belum ada data kehadiran</td></tr>';
     } else {
       tbody.innerHTML = rows.map(function (r) {
+        var badgeCls = (r.status === 'Tamu') ? 'kp-badge-draft' : 'kp-badge-aktif';
         return '<tr>' +
           '<td>' + r.no + '</td>' +
           '<td>' + escapeHtml(r.noAnggota) + '</td>' +
           '<td class="kp-fw-700">' + escapeHtml(r.nama) + '</td>' +
           '<td>' + escapeHtml(r.ranting) + '</td>' +
           '<td>' + escapeHtml(r.jamHadir) + '</td>' +
-          '<td><span class="kp-badge kp-badge-aktif">' + escapeHtml(r.status) + '</span></td>' +
+          '<td><span class="kp-badge ' + badgeCls + '">' + escapeHtml(r.status) + '</span></td>' +
           '</tr>';
       }).join('');
     }
-    document.getElementById('attendance-total-info').textContent = 'Total: ' + rows.length + ' hadir';
+    var tAnggota = (res && res.totalAnggota !== undefined) ? res.totalAnggota : rows.length;
+    var tTamu = (res && res.totalTamu) ? res.totalTamu : 0;
+    document.getElementById('attendance-total-info').textContent =
+      'Anggota hadir: ' + tAnggota + (tTamu ? '  \u00b7  Tamu undangan: ' + tTamu : '');
   });
 }
 
@@ -1236,8 +1289,11 @@ function exportAttendanceExcel() {
   lastAttendanceRows.forEach(function (r) {
     aoa.push([r.no, r.noAnggota, r.nama, r.ranting, r.jamHadir, r.status]);
   });
+  var jmlTamu = lastAttendanceRows.filter(function (r) { return r.status === 'Tamu'; }).length;
+  var jmlAnggota = lastAttendanceRows.length - jmlTamu;
   aoa.push([]);
-  aoa.push(['Total Hadir: ' + lastAttendanceRows.length + ' anggota']);
+  aoa.push(['Anggota hadir: ' + jmlAnggota + ' orang']);
+  if (jmlTamu) aoa.push(['Tamu undangan: ' + jmlTamu + ' orang']);
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
 
