@@ -641,6 +641,9 @@
   <!-- SheetJS untuk Export Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Konfigurasi aplikasi (API_URL) - file terpisah, tidak ikut diperbarui -->
+  <script src="config.js"></script>
+
   <script>
 /* =========================================================
    KOPANA Smart Attendance RAT - AppJs.html
@@ -649,10 +652,11 @@
    ========================================================= */
 
 /* ============================================================
-   PENTING: Ganti nilai API_URL di bawah dengan URL Web App
-   Apps Script Anda (yang berakhiran /exec).
+   API_URL didefinisikan di file terpisah: config.js
+   File itu TIDAK ikut tertimpa saat index.html diperbarui,
+   sehingga URL Web App tidak perlu diisi ulang tiap update.
    ============================================================ */
-var API_URL = 'https://script.google.com/macros/s/AKfycbwJiiLGcVlXWf3xELIcWTSoNtYSyGmbF4iQwxahWtxuV2Gpds0sKFzr_jl8Gm1tqa4c/exec';
+var API_URL = (typeof KOPANA_CONFIG !== 'undefined' && KOPANA_CONFIG.API_URL) ? KOPANA_CONFIG.API_URL : '';
 
 var STATE = {
   token: sessionStorage.getItem('kp_token') || null,
@@ -682,6 +686,17 @@ document.addEventListener('DOMContentLoaded', init);
 function init() {
   bindLoginForm();
   bindGlobalHandlers();
+
+  if (!API_URL) {
+    hideSplash();
+    Swal.fire({
+      icon: 'error',
+      title: 'Konfigurasi belum lengkap',
+      html: 'File <b>config.js</b> tidak ditemukan atau <b>API_URL</b> masih kosong.<br>' +
+            'Hubungi Admin untuk memperbaiki konfigurasi aplikasi.'
+    });
+    return;
+  }
 
   if (STATE.token) {
     api('whoAmI', {}).then(function (res) {
