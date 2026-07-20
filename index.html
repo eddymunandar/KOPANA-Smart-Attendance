@@ -1243,7 +1243,11 @@ var attendanceSearchTimer;
 function bindAttendancePage() {
   document.getElementById('attendance-search').addEventListener('keyup', function () {
     clearTimeout(attendanceSearchTimer);
-    attendanceSearchTimer = setTimeout(loadAttendanceData, 350);
+    document.getElementById('attendance-total-info').textContent = 'Mencari...';
+    attendanceSearchTimer = setTimeout(function () {
+      attendanceLoading = false; // pastikan pencarian terbaru selalu dijalankan
+      loadAttendanceData();
+    }, 400);
   });
   document.getElementById('attendance-filter-ranting').addEventListener('change', loadAttendanceData);
   document.getElementById('btn-refresh-attendance').addEventListener('click', loadAttendanceData);
@@ -1315,12 +1319,23 @@ function initAttendancePage() {
   });
 
   if (STATE.attendanceInterval) clearInterval(STATE.attendanceInterval);
-  STATE.attendanceInterval = setInterval(loadAttendanceData, 8000);
+  // Refresh berkala 15 detik, dan dilewati bila halaman sedang tidak terlihat
+  // (menghemat beban server saat beberapa petugas membuka aplikasi bersamaan).
+  STATE.attendanceInterval = setInterval(function () {
+    if (document.hidden) return;
+    loadAttendanceData();
+  }, 15000);
 }
 
 var lastAttendanceRows = [];
 
+var attendanceLoading = false;
+
 function loadAttendanceData() {
+  // Jika permintaan sebelumnya belum selesai, lewati agar tidak menumpuk
+  if (attendanceLoading) return;
+  attendanceLoading = true;
+
   var keyword = document.getElementById('attendance-search').value.trim();
   var ranting = document.getElementById('attendance-filter-ranting').value;
 
@@ -1362,6 +1377,10 @@ function loadAttendanceData() {
       'Anggota hadir: ' + tAnggota +
       (tTamu ? '  \u00b7  Tamu undangan: ' + tTamu : '') +
       '  \u00b7  Transport diserahkan: ' + tTransport;
+  }).catch(function () {
+    /* biarkan data lama tampil bila koneksi gagal */
+  }).then(function () {
+    attendanceLoading = false;
   });
 }
 
