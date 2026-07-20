@@ -114,15 +114,43 @@ var Database = (function () {
 
   /**
    * Update baris berdasarkan nomor baris (__row) dengan data parsial.
+   * OPTIMASI: seluruh kolom ditulis dalam SATU panggilan setValues().
+   * Sebelumnya tiap kolom ditulis terpisah (setValue per kolom), yang
+   * membuat proses simpan lambat karena tiap penulisan = 1 round trip.
    */
   function updateByRow(sheetName, rowNumber, updates) {
     var sheet = getSheet(sheetName);
     var headers = getHeaders(sheet);
-    headers.forEach(function (h, idx) {
-      if (h in updates) {
-        sheet.getRange(rowNumber, idx + 1).setValue(updates[h]);
+    var lastCol = headers.length;
+    if (!lastCol) return;
+
+    var range = sheet.getRange(rowNumber, 1, 1, lastCol);
+    var current = range.getValues()[0];
+
+    var berubah = false;
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] && (headers[i] in updates)) {
+        current[i] = updates[headers[i]];
+        berubah = true;
       }
-    });
+    }
+    if (berubah) range.setValues([current]);
+  }
+
+  /**
+   * Membaca SATU baris saja sebagai object (jauh lebih cepat daripada
+   * getAll() lalu mencari barisnya).
+   */
+  function getRow(sheetName, rowNumber) {
+    var sheet = getSheet(sheetName);
+    if (rowNumber < 2 || rowNumber > sheet.getLastRow()) return null;
+    var headers = getHeaders(sheet);
+    var values = sheet.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+    var obj = { __row: rowNumber };
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i]) obj[headers[i]] = values[i];
+    }
+    return obj;
   }
 
   /**
@@ -169,6 +197,7 @@ var Database = (function () {
     findWhere: findWhere,
     insert: insert,
     updateByRow: updateByRow,
+    getRow: getRow,
     getSettings: getSettings,
     saveSettings: saveSettings
   };

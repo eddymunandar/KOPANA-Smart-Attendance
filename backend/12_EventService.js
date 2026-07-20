@@ -17,8 +17,28 @@ var EventService = (function () {
     return { success: true, data: events };
   }
 
+  var CACHE_KEY_ACTIVE = 'active_event_v1';
+  var CACHE_TTL_SEC = 120;
+
+  /**
+   * Event aktif dibaca sangat sering (tiap scan, tiap refresh data).
+   * Hasilnya disimpan di cache singkat agar tidak membaca sheet berulang.
+   * Cache otomatis dibuang saat event diubah/diaktifkan/ditutup.
+   */
   function getActiveEvent() {
-    return Database.findOne(CONFIG.SHEET.EVENT, 'Status', STATUS_EVENT.AKTIF);
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(CACHE_KEY_ACTIVE);
+    if (cached) {
+      if (cached === 'NONE') return null;
+      try { return JSON.parse(cached); } catch (e) { /* abaikan, baca ulang */ }
+    }
+    var ev = Database.findOne(CONFIG.SHEET.EVENT, 'Status', STATUS_EVENT.AKTIF);
+    cache.put(CACHE_KEY_ACTIVE, ev ? JSON.stringify(ev) : 'NONE', CACHE_TTL_SEC);
+    return ev;
+  }
+
+  function clearActiveEventCache_() {
+    CacheService.getScriptCache().remove(CACHE_KEY_ACTIVE);
   }
 
   function createEvent(payload, actingUser) {
@@ -34,6 +54,7 @@ var EventService = (function () {
       CreatedBy: actingUser.username,
       CreatedAt: new Date()
     });
+    clearActiveEventCache_();
     ActivityLogger.log(actingUser.username, LOG_ACTION.TAMBAH_EVENT, payload.namaEvent);
     return { success: true, message: 'Event RAT berhasil ditambahkan' };
   }
@@ -46,6 +67,7 @@ var EventService = (function () {
       NamaEvent: payload.namaEvent || event.NamaEvent,
       Tanggal: payload.tanggal || event.Tanggal
     });
+    clearActiveEventCache_();
     ActivityLogger.log(actingUser.username, LOG_ACTION.EDIT_EVENT, payload.eventId);
     return { success: true, message: 'Event RAT berhasil diperbarui' };
   }
@@ -55,6 +77,7 @@ var EventService = (function () {
     if (!event) throw new AppError('Event tidak ditemukan');
 
     Database.updateByRow(CONFIG.SHEET.EVENT, event.__row, { Status: STATUS_EVENT.TUTUP });
+    clearActiveEventCache_();
     ActivityLogger.log(actingUser.username, LOG_ACTION.TUTUP_EVENT, payload.eventId);
     return { success: true, message: 'Event RAT ditutup' };
   }
@@ -79,6 +102,7 @@ var EventService = (function () {
     });
 
     Database.updateByRow(CONFIG.SHEET.EVENT, target.__row, { Status: STATUS_EVENT.AKTIF });
+    clearActiveEventCache_();
     ActivityLogger.log(actingUser.username, LOG_ACTION.SET_EVENT_AKTIF, target.NamaEvent);
     return { success: true, message: 'Event "' + target.NamaEvent + '" kini menjadi Event Aktif' };
   }
@@ -92,4 +116,3 @@ var EventService = (function () {
     setActiveEvent: setActiveEvent
   };
 })();
-

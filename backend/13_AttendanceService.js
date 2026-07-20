@@ -244,12 +244,8 @@ var AttendanceService = (function () {
       return { success: false, code: 'NO_EVENT', message: MESSAGES.NO_ACTIVE_EVENT };
     }
 
-    // Ambil baris terkait dan pastikan memang milik event yang aktif
-    var all = Database.getAll(CONFIG.SHEET.ATTENDANCE);
-    var target = null;
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].__row === rowNumber) { target = all[i]; break; }
-    }
+    // Baca HANYA baris yang diperlukan (jauh lebih cepat daripada getAll)
+    var target = Database.getRow(CONFIG.SHEET.ATTENDANCE, rowNumber);
     if (!target) {
       return { success: false, code: 'NOT_FOUND', message: 'Data kehadiran tidak ditemukan' };
     }
