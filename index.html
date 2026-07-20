@@ -260,7 +260,7 @@
   <!-- ===== Login ===== -->
 <div id="login-shell" class="kp-hidden">
   <div class="kp-login-card">
-    <div class="kp-login-mark"><i class="fa-solid fa-clipboard-check"></i></div>
+    <div class="kp-login-mark kp-logo-target"><i class="fa-solid fa-clipboard-check"></i></div>
     <h1>KOPANA</h1>
     <div class="kp-sub">Smart Attendance &middot; Rapat Anggota Tahunan</div>
 
@@ -296,7 +296,7 @@
     <!-- Sidebar (desktop) -->
     <aside class="kp-sidebar">
       <div class="kp-brand">
-        <div class="mark"><i class="fa-solid fa-clipboard-check"></i></div>
+        <div class="mark kp-logo-target"><i class="fa-solid fa-clipboard-check"></i></div>
         <div class="txt"><strong id="kp-brand-name">KOPANA</strong><span>Smart Attendance RAT</span></div>
       </div>
       <nav id="kp-nav-desktop"></nav>
@@ -307,7 +307,7 @@
     <div class="offcanvas offcanvas-start kp-offcanvas" tabindex="-1" id="kpOffcanvas">
       <div class="offcanvas-body">
         <div class="kp-brand" style="padding-top:4px;">
-          <div class="mark"><i class="fa-solid fa-clipboard-check"></i></div>
+          <div class="mark kp-logo-target"><i class="fa-solid fa-clipboard-check"></i></div>
           <div class="txt"><strong>KOPANA</strong><span>Smart Attendance RAT</span></div>
         </div>
         <nav id="kp-nav-mobile"></nav>
@@ -1038,10 +1038,20 @@ function initScannerPage() {
 
 function startScanner() {
   if (STATE.scannerRunning) return;
-  var config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 };
+  var config = {
+    fps: 10,
+    qrbox: function (viewfinderWidth, viewfinderHeight) {
+      var size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
+      return { width: size, height: size };
+    },
+    videoConstraints: {
+      facingMode: STATE.cameraFacing,
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  };
   if (!STATE.html5QrCode) STATE.html5QrCode = new Html5Qrcode('qr-reader');
 
-  // Di halaman top-level (GitHub Pages) facingMode bekerja normal.
   STATE.html5QrCode.start({ facingMode: STATE.cameraFacing }, config, onScanSuccess, function () {})
     .then(function () { STATE.scannerRunning = true; })
     .catch(function () {
@@ -1214,6 +1224,7 @@ function exportAttendanceExcel() {
   var tanggalExport = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear() +
     ' ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
 
+  // Susun isi sheet: judul di atas, lalu tabel
   var aoa = [
     ['DAFTAR HADIR RAPAT ANGGOTA TAHUNAN'],
     [namaKoperasi],
@@ -1230,6 +1241,7 @@ function exportAttendanceExcel() {
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
 
+  // Gabungkan sel judul agar melebar 6 kolom
   ws['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
@@ -1237,6 +1249,7 @@ function exportAttendanceExcel() {
     { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }
   ];
 
+  // Lebar kolom
   ws['!cols'] = [
     { wch: 5 },
     { wch: 12 },
@@ -1257,6 +1270,7 @@ function printAttendance() {
   window.print();
   setTimeout(function () { header.style.display = 'none'; }, 500);
 }
+
 /* ---------------- Pengaturan ---------------- */
 
 function bindSettingsPage() {
@@ -1312,6 +1326,35 @@ function loadSettingsBadge() {
 function applySettingsToUI() {
   if (STATE.settings.namaKoperasi) {
     document.getElementById('kp-brand-name').textContent = STATE.settings.namaKoperasi;
+  }
+  applyLogo_();
+}
+
+/**
+ * Menampilkan logo koperasi (dari Pengaturan > URL Logo) pada halaman Login
+ * dan sidebar. Jika URL kosong atau gambar gagal dimuat, kembali ke ikon bawaan.
+ */
+function applyLogo_() {
+  var url = (STATE.settings.logoUrl || '').trim();
+  var targets = document.querySelectorAll('.kp-logo-target');
+  for (var i = 0; i < targets.length; i++) {
+    var el = targets[i];
+    if (!url) {
+      el.innerHTML = '<i class="fa-solid fa-clipboard-check"></i>';
+      continue;
+    }
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Logo';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'contain';
+    img.style.borderRadius = 'inherit';
+    img.onerror = (function (parent) {
+      return function () { parent.innerHTML = '<i class="fa-solid fa-clipboard-check"></i>'; };
+    })(el);
+    el.innerHTML = '';
+    el.appendChild(img);
   }
 }
   </script>
