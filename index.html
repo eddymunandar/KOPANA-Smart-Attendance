@@ -535,7 +535,10 @@
           <i class="fa-solid fa-print me-1"></i> Cetak
         </button>
         <button class="btn kp-btn-gold btn-sm" id="btn-export-attendance">
-          <i class="fa-solid fa-file-excel me-1"></i> Export Excel
+          <i class="fa-solid fa-file-excel me-1"></i> Excel
+        </button>
+        <button class="btn btn-danger btn-sm" id="btn-export-pdf" style="border-radius:var(--kp-radius-sm); font-weight:700;">
+          <i class="fa-solid fa-file-pdf me-1"></i> PDF
         </button>
       </div>
     </div>
@@ -641,6 +644,9 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <!-- ExcelJS untuk Export Excel (mendukung format: tebal, garis, warna) -->
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <!-- jsPDF + AutoTable untuk Export PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 
   <!-- Konfigurasi aplikasi (API_URL) - file terpisah, tidak ikut diperbarui -->
   <script src="config.js"></script>
@@ -1269,6 +1275,7 @@ function bindAttendancePage() {
   document.getElementById('attendance-filter-ranting').addEventListener('change', loadAttendanceData);
   document.getElementById('btn-refresh-attendance').addEventListener('click', loadAttendanceData);
   document.getElementById('btn-export-attendance').addEventListener('click', exportAttendanceExcel);
+  document.getElementById('btn-export-pdf').addEventListener('click', exportAttendancePdf);
   document.getElementById('btn-print-attendance').addEventListener('click', printAttendance);
 
   // Tombol serah / batal transport
@@ -1401,172 +1408,377 @@ function loadAttendanceData() {
   });
 }
 
-function exportAttendanceExcel() {
-  if (!lastAttendanceRows.length) { toast('info', 'Tidak ada data untuk diexport'); return; }
+/* ---------- Bahan bersama untuk Export Excel & PDF ---------- */
 
+var EXPORT_KOLOM = [
+  { key: 'no',        header: 'No',              align: 'center', min: 5,  max: 8 },
+  { key: 'noAnggota', header: 'No Anggota',      align: 'center', min: 11, max: 16 },
+  { key: 'nama',      header: 'Nama',            align: 'left',   min: 18, max: 40 },
+  { key: 'ranting',   header: 'Ranting',         align: 'left',   min: 12, max: 28 },
+  { key: 'jamHadir',  header: 'Jam Hadir',       align: 'center', min: 18, max: 22 },
+  { key: 'status',    header: 'Status',          align: 'center', min: 9,  max: 12 },
+  { key: 'transport', header: 'Transport',       align: 'center', min: 10, max: 14 },
+  { key: 'trJam',     header: 'Jam Transport',   align: 'center', min: 18, max: 22 },
+  { key: 'trOleh',    header: 'Diserahkan Oleh', align: 'center', min: 14, max: 22 }
+];
+
+function exportBarisNilai_(r) {
+  return [
+    r.no,
+    r.noAnggota,
+    r.nama,
+    r.ranting,
+    r.jamHadir,
+    r.status,
+    r.transport === 'Sudah' ? 'Sudah' : 'Belum',
+    r.transportJam || '',
+    r.transportOleh || ''
+  ];
+}
+
+/**
+ * Lebar kolom mengikuti isi terpanjang (header maupun data),
+ * dibatasi nilai minimum & maksimum agar tetap proporsional.
+ */
+function hitungLebarKolom_() {
+  return EXPORT_KOLOM.map(function (k, idx) {
+    var terpanjang = String(k.header).length;
+    lastAttendanceRows.forEach(function (r) {
+      var v = exportBarisNilai_(r)[idx];
+      var panjang = String(v === null || v === undefined ? '' : v).length;
+      if (panjang > terpanjang) terpanjang = panjang;
+    });
+    var lebar = terpanjang + 3;
+    if (lebar < k.min) lebar = k.min;
+    if (lebar > k.max) lebar = k.max;
+    return lebar;
+  });
+}
+
+function exportRingkasan_() {
+  var jmlTamu = lastAttendanceRows.filter(function (r) { return r.status === 'Tamu'; }).length;
+  var jmlTransport = lastAttendanceRows.filter(function (r) { return r.transport === 'Sudah'; }).length;
+  return {
+    anggota: lastAttendanceRows.length - jmlTamu,
+    tamu: jmlTamu,
+    transport: jmlTransport
+  };
+}
+
+function exportJudul_() {
   var namaKoperasi = (STATE.settings && STATE.settings.namaKoperasi) ? STATE.settings.namaKoperasi : 'KOPANA';
   var namaEvent = document.getElementById('print-event-name').textContent || '-';
   var now = new Date();
   var tanggalExport = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear() +
     ' ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  return { namaKoperasi: namaKoperasi, namaEvent: namaEvent, tanggalExport: tanggalExport };
+}
 
-  var jmlTamu = lastAttendanceRows.filter(function (r) { return r.status === 'Tamu'; }).length;
-  var jmlAnggota = lastAttendanceRows.length - jmlTamu;
-  var jmlTransport = lastAttendanceRows.filter(function (r) { return r.transport === 'Sudah'; }).length;
+/**
+ * Mengambil logo (dari Pengaturan) sebagai data URL agar bisa disisipkan
+ * ke file Excel/PDF. Bila gagal (URL kosong/tidak dapat diakses),
+ * menghasilkan null dan export tetap berjalan tanpa logo.
+ */
+function ambilLogoDataUrl_() {
+  return new Promise(function (resolve) {
+    var url = (STATE.settings && STATE.settings.logoUrl ? STATE.settings.logoUrl : '').trim();
+    if (!url) return resolve(null);
+
+    fetch(url).then(function (resp) {
+      if (!resp.ok) throw new Error('gagal');
+      return resp.blob();
+    }).then(function (blob) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          resolve({
+            dataUrl: reader.result,
+            lebar: img.width,
+            tinggi: img.height,
+            ext: (blob.type.indexOf('png') !== -1) ? 'png' : 'jpeg'
+          });
+        };
+        img.onerror = function () { resolve(null); };
+        img.src = reader.result;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(blob);
+    }).catch(function () { resolve(null); });
+  });
+}
+
+/* ---------- Export Excel ---------- */
+
+function exportAttendanceExcel() {
+  if (!lastAttendanceRows.length) { toast('info', 'Tidak ada data untuk diexport'); return; }
 
   var btn = document.getElementById('btn-export-attendance');
   btn.disabled = true;
 
-  var wb = new ExcelJS.Workbook();
-  wb.creator = namaKoperasi;
-  wb.created = now;
-  var ws = wb.addWorksheet('Daftar Hadir', {
-    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
-  });
+  var info = exportJudul_();
+  var ringkas = exportRingkasan_();
+  var lebar = hitungLebarKolom_();
+  var LAST_COL = EXPORT_KOLOM.length;
 
-  var KOLOM = [
-    { key: 'no',        header: 'No',              width: 6,  align: 'center' },
-    { key: 'noAnggota', header: 'No Anggota',      width: 13, align: 'center' },
-    { key: 'nama',      header: 'Nama',            width: 32, align: 'left' },
-    { key: 'ranting',   header: 'Ranting',         width: 18, align: 'left' },
-    { key: 'jamHadir',  header: 'Jam Hadir',       width: 20, align: 'center' },
-    { key: 'status',    header: 'Status',          width: 11, align: 'center' },
-    { key: 'transport', header: 'Transport',       width: 12, align: 'center' },
-    { key: 'trJam',     header: 'Jam Transport',   width: 20, align: 'center' },
-    { key: 'trOleh',    header: 'Diserahkan Oleh', width: 17, align: 'center' }
-  ];
-  var LAST_COL = KOLOM.length; // 9 -> kolom I
-  ws.columns = KOLOM.map(function (k) { return { width: k.width }; });
+  ambilLogoDataUrl_().then(function (logo) {
+    var wb = new ExcelJS.Workbook();
+    wb.creator = info.namaKoperasi;
+    wb.created = new Date();
+    var ws = wb.addWorksheet('Daftar Hadir', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+    });
 
-  // ---------- Judul ----------
-  var judul = [
-    { teks: 'DAFTAR HADIR RAPAT ANGGOTA TAHUNAN', size: 14, bold: true },
-    { teks: namaKoperasi,                          size: 12, bold: true },
-    { teks: namaEvent,                             size: 11, bold: true },
-    { teks: 'Diexport: ' + tanggalExport,          size: 10, bold: false }
-  ];
-  judul.forEach(function (j, i) {
-    var baris = i + 1;
-    ws.mergeCells(baris, 1, baris, LAST_COL);
-    var sel = ws.getCell(baris, 1);
-    sel.value = j.teks;
-    sel.font = { name: 'Calibri', size: j.size, bold: j.bold, color: { argb: 'FF0B1F3A' } };
-    sel.alignment = { horizontal: 'center', vertical: 'middle' };
-    ws.getRow(baris).height = j.size + 8;
-  });
-  ws.addRow([]); // baris 5 kosong
+    ws.columns = lebar.map(function (w) { return { width: w }; });
 
-  // ---------- Header tabel (baris 6) ----------
-  var BARIS_HEADER = 6;
-  var rowHeader = ws.getRow(BARIS_HEADER);
-  KOLOM.forEach(function (k, idx) {
-    var sel = rowHeader.getCell(idx + 1);
-    sel.value = k.header;
-    sel.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-    sel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A4B8C' } };
-    sel.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    sel.border = {
-      top:    { style: 'thin', color: { argb: 'FF0B1F3A' } },
-      left:   { style: 'thin', color: { argb: 'FF0B1F3A' } },
-      bottom: { style: 'thin', color: { argb: 'FF0B1F3A' } },
-      right:  { style: 'thin', color: { argb: 'FF0B1F3A' } }
-    };
-  });
-  rowHeader.height = 22;
-
-  // ---------- Isi tabel ----------
-  lastAttendanceRows.forEach(function (r, i) {
-    var baris = BARIS_HEADER + 1 + i;
-    var nilai = [
-      r.no,
-      r.noAnggota,
-      r.nama,
-      r.ranting,
-      r.jamHadir,
-      r.status,
-      r.transport === 'Sudah' ? 'Sudah' : 'Belum',
-      r.transportJam || '',
-      r.transportOleh || ''
+    // ----- Judul (kolom B..I), logo di kolom A -----
+    var judul = [
+      { teks: 'DAFTAR HADIR RAPAT ANGGOTA TAHUNAN', size: 14, bold: true },
+      { teks: info.namaKoperasi,                     size: 12, bold: true },
+      { teks: info.namaEvent,                        size: 11, bold: true },
+      { teks: 'Diexport: ' + info.tanggalExport,     size: 10, bold: false }
     ];
-    var row = ws.getRow(baris);
-    nilai.forEach(function (v, idx) {
-      var sel = row.getCell(idx + 1);
-      sel.value = v;
-      sel.font = { name: 'Calibri', size: 10 };
-      sel.alignment = { horizontal: KOLOM[idx].align, vertical: 'middle' };
+    var kolomJudulMulai = logo ? 2 : 1;
+    judul.forEach(function (j, i) {
+      var baris = i + 1;
+      ws.mergeCells(baris, kolomJudulMulai, baris, LAST_COL);
+      var sel = ws.getCell(baris, kolomJudulMulai);
+      sel.value = j.teks;
+      sel.font = { name: 'Calibri', size: j.size, bold: j.bold, color: { argb: 'FF0B1F3A' } };
+      sel.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(baris).height = 20;
+    });
+
+    if (logo) {
+      // Jaga proporsi logo, tinggi maksimal setara 4 baris judul (~76px)
+      var tinggiMax = 76;
+      var skala = tinggiMax / logo.tinggi;
+      var lebarLogo = Math.round(logo.lebar * skala);
+      if (lebarLogo > 110) { lebarLogo = 110; skala = lebarLogo / logo.lebar; }
+      var idGambar = wb.addImage({ base64: logo.dataUrl, extension: logo.ext });
+      ws.addImage(idGambar, {
+        tl: { col: 0.2, row: 0.2 },
+        ext: { width: lebarLogo, height: Math.round(logo.tinggi * skala) },
+        editAs: 'oneCell'
+      });
+      if (ws.getColumn(1).width < 16) ws.getColumn(1).width = 16;
+    }
+
+    ws.addRow([]);
+
+    // ----- Header tabel -----
+    var BARIS_HEADER = 6;
+    var rowHeader = ws.getRow(BARIS_HEADER);
+    EXPORT_KOLOM.forEach(function (k, idx) {
+      var sel = rowHeader.getCell(idx + 1);
+      sel.value = k.header;
+      sel.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      sel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A4B8C' } };
+      sel.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       sel.border = {
-        top:    { style: 'thin', color: { argb: 'FFBFBFBF' } },
-        left:   { style: 'thin', color: { argb: 'FFBFBFBF' } },
-        bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-        right:  { style: 'thin', color: { argb: 'FFBFBFBF' } }
+        top:    { style: 'thin', color: { argb: 'FF0B1F3A' } },
+        left:   { style: 'thin', color: { argb: 'FF0B1F3A' } },
+        bottom: { style: 'thin', color: { argb: 'FF0B1F3A' } },
+        right:  { style: 'thin', color: { argb: 'FF0B1F3A' } }
       };
     });
-    // Selang-seling warna baris agar mudah dibaca
-    if (i % 2 === 1) {
-      row.eachCell(function (sel) {
-        sel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F8FF' } };
+    rowHeader.height = 22;
+
+    // ----- Isi tabel -----
+    lastAttendanceRows.forEach(function (r, i) {
+      var row = ws.getRow(BARIS_HEADER + 1 + i);
+      exportBarisNilai_(r).forEach(function (v, idx) {
+        var sel = row.getCell(idx + 1);
+        sel.value = v;
+        sel.font = { name: 'Calibri', size: 10 };
+        sel.alignment = { horizontal: EXPORT_KOLOM[idx].align, vertical: 'middle' };
+        sel.border = {
+          top:    { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          left:   { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          right:  { style: 'thin', color: { argb: 'FFBFBFBF' } }
+        };
       });
-    }
-    // Tandai baris tamu
-    if (r.status === 'Tamu') {
-      row.getCell(6).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFD97706' } };
-    }
-    // Tandai transport yang belum diserahkan
-    if (r.transport !== 'Sudah') {
-      row.getCell(7).font = { name: 'Calibri', size: 10, color: { argb: 'FFDC2626' } };
-    }
-    row.height = 18;
-  });
+      if (i % 2 === 1) {
+        row.eachCell(function (sel) {
+          sel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F8FF' } };
+        });
+      }
+      if (r.status === 'Tamu') {
+        row.getCell(6).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFD97706' } };
+      }
+      if (r.transport !== 'Sudah') {
+        row.getCell(7).font = { name: 'Calibri', size: 10, color: { argb: 'FFDC2626' } };
+      }
+      row.height = 18;
+    });
 
-  // ---------- Ringkasan ----------
-  var barisRingkas = BARIS_HEADER + lastAttendanceRows.length + 2;
-  var ringkasan = [
-    'Anggota hadir       : ' + jmlAnggota + ' orang',
-    'Tamu undangan       : ' + jmlTamu + ' orang',
-    'Transport diserahkan: ' + jmlTransport + ' orang'
-  ];
-  ringkasan.forEach(function (teks, i) {
-    var baris = barisRingkas + i;
-    ws.mergeCells(baris, 1, baris, 4);
-    var sel = ws.getCell(baris, 1);
-    sel.value = teks;
-    sel.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0B1F3A' } };
-    sel.alignment = { horizontal: 'left', vertical: 'middle' };
-  });
+    // ----- Ringkasan -----
+    var barisRingkas = BARIS_HEADER + lastAttendanceRows.length + 2;
+    [
+      'Anggota hadir       : ' + ringkas.anggota + ' orang',
+      'Tamu undangan       : ' + ringkas.tamu + ' orang',
+      'Transport diserahkan: ' + ringkas.transport + ' orang'
+    ].forEach(function (teks, i) {
+      var baris = barisRingkas + i;
+      ws.mergeCells(baris, 1, baris, 4);
+      var sel = ws.getCell(baris, 1);
+      sel.value = teks;
+      sel.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0B1F3A' } };
+      sel.alignment = { horizontal: 'left', vertical: 'middle' };
+    });
 
-  // Kolom tanda tangan pengesahan
-  var barisTtd = barisRingkas + ringkasan.length + 2;
-  ws.mergeCells(barisTtd, 6, barisTtd, LAST_COL);
-  var selTtd = ws.getCell(barisTtd, 6);
-  selTtd.value = 'Mengetahui,';
-  selTtd.alignment = { horizontal: 'center' };
-  selTtd.font = { name: 'Calibri', size: 10 };
+    // ----- Tanda tangan pengesahan -----
+    var barisTtd = barisRingkas + 5;
+    ws.mergeCells(barisTtd, 6, barisTtd, LAST_COL);
+    var selTtd = ws.getCell(barisTtd, 6);
+    selTtd.value = 'Mengetahui,';
+    selTtd.alignment = { horizontal: 'center' };
+    selTtd.font = { name: 'Calibri', size: 10 };
 
-  ws.mergeCells(barisTtd + 4, 6, barisTtd + 4, LAST_COL);
-  var selTtd2 = ws.getCell(barisTtd + 4, 6);
-  selTtd2.value = '( ......................................... )';
-  selTtd2.alignment = { horizontal: 'center' };
-  selTtd2.font = { name: 'Calibri', size: 10 };
+    ws.mergeCells(barisTtd + 4, 6, barisTtd + 4, LAST_COL);
+    var selTtd2 = ws.getCell(barisTtd + 4, 6);
+    selTtd2.value = '( ......................................... )';
+    selTtd2.alignment = { horizontal: 'center' };
+    selTtd2.font = { name: 'Calibri', size: 10 };
 
-  // Baris header tetap terlihat saat digulir
-  ws.views = [{ state: 'frozen', ySplit: BARIS_HEADER }];
+    ws.views = [{ state: 'frozen', ySplit: BARIS_HEADER }];
 
-  // ---------- Unduh ----------
-  wb.xlsx.writeBuffer().then(function (buffer) {
-    var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'Daftar-Hadir-RAT-' + namaKoperasi.replace(/[^A-Za-z0-9]/g, '') + '.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    return wb.xlsx.writeBuffer();
+  }).then(function (buffer) {
+    unduhBerkas_(
+      new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      'Daftar-Hadir-RAT-' + info.namaKoperasi.replace(/[^A-Za-z0-9]/g, '') + '.xlsx'
+    );
     btn.disabled = false;
   }).catch(function () {
     Swal.fire('Gagal', 'Tidak dapat membuat file Excel', 'error');
     btn.disabled = false;
   });
+}
+
+/* ---------- Export PDF ---------- */
+
+function exportAttendancePdf() {
+  if (!lastAttendanceRows.length) { toast('info', 'Tidak ada data untuk diexport'); return; }
+
+  var btn = document.getElementById('btn-export-pdf');
+  btn.disabled = true;
+
+  var info = exportJudul_();
+  var ringkas = exportRingkasan_();
+
+  ambilLogoDataUrl_().then(function (logo) {
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    var lebarHalaman = doc.internal.pageSize.getWidth();
+    var margin = 10;
+
+    // ----- Logo di kiri -----
+    var yJudul = 14;
+    if (logo) {
+      var tinggiLogo = 22;
+      var lebarLogo = (logo.lebar / logo.tinggi) * tinggiLogo;
+      if (lebarLogo > 30) { lebarLogo = 30; tinggiLogo = (logo.tinggi / logo.lebar) * lebarLogo; }
+      try {
+        doc.addImage(logo.dataUrl, logo.ext.toUpperCase(), margin, 8, lebarLogo, tinggiLogo);
+      } catch (e) { /* lewati bila format tidak didukung */ }
+    }
+
+    // ----- Judul rata tengah -----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(11, 31, 58);
+    doc.text('DAFTAR HADIR RAPAT ANGGOTA TAHUNAN', lebarHalaman / 2, yJudul, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(info.namaKoperasi, lebarHalaman / 2, yJudul + 6, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.text(info.namaEvent, lebarHalaman / 2, yJudul + 12, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(90, 100, 114);
+    doc.text('Diexport: ' + info.tanggalExport, lebarHalaman / 2, yJudul + 17, { align: 'center' });
+
+    // ----- Tabel -----
+    var lebar = hitungLebarKolom_();
+    var totalLebar = lebar.reduce(function (a, b) { return a + b; }, 0);
+    var lebarTersedia = lebarHalaman - (margin * 2);
+    var columnStyles = {};
+    EXPORT_KOLOM.forEach(function (k, idx) {
+      columnStyles[idx] = {
+        halign: k.align,
+        cellWidth: (lebar[idx] / totalLebar) * lebarTersedia
+      };
+    });
+
+    doc.autoTable({
+      startY: yJudul + 22,
+      margin: { left: margin, right: margin },
+      head: [EXPORT_KOLOM.map(function (k) { return k.header; })],
+      body: lastAttendanceRows.map(exportBarisNilai_),
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.6, lineColor: [191, 191, 191], lineWidth: 0.1 },
+      headStyles: { fillColor: [26, 75, 140], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 8 },
+      alternateRowStyles: { fillColor: [244, 248, 255] },
+      columnStyles: columnStyles,
+      didParseCell: function (data) {
+        if (data.section !== 'body') return;
+        if (data.column.index === 5 && data.cell.raw === 'Tamu') {
+          data.cell.styles.textColor = [217, 119, 6];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        if (data.column.index === 6 && data.cell.raw === 'Belum') {
+          data.cell.styles.textColor = [220, 38, 38];
+        }
+      }
+    });
+
+    // ----- Ringkasan + tanda tangan -----
+    var y = doc.lastAutoTable.finalY + 8;
+    if (y > doc.internal.pageSize.getHeight() - 45) { doc.addPage(); y = 20; }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(11, 31, 58);
+    doc.text('Anggota hadir        : ' + ringkas.anggota + ' orang', margin, y);
+    doc.text('Tamu undangan        : ' + ringkas.tamu + ' orang', margin, y + 5);
+    doc.text('Transport diserahkan : ' + ringkas.transport + ' orang', margin, y + 10);
+
+    doc.setFont('helvetica', 'normal');
+    var xTtd = lebarHalaman - margin - 55;
+    doc.text('Mengetahui,', xTtd + 27, y, { align: 'center' });
+    doc.text('( ................................. )', xTtd + 27, y + 22, { align: 'center' });
+
+    // Nomor halaman
+    var totalHal = doc.internal.getNumberOfPages();
+    for (var i = 1; i <= totalHal; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(120, 128, 140);
+      doc.text('Halaman ' + i + ' dari ' + totalHal,
+        lebarHalaman - margin, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+    }
+
+    doc.save('Daftar-Hadir-RAT-' + info.namaKoperasi.replace(/[^A-Za-z0-9]/g, '') + '.pdf');
+    btn.disabled = false;
+  }).catch(function () {
+    Swal.fire('Gagal', 'Tidak dapat membuat file PDF', 'error');
+    btn.disabled = false;
+  });
+}
+
+function unduhBerkas_(blob, namaFile) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = namaFile;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 
 function printAttendance() {
