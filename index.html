@@ -572,10 +572,11 @@
               <th>Ranting</th>
               <th>Jam Hadir</th>
               <th>Status</th>
+              <th>Transport</th>
             </tr>
           </thead>
           <tbody id="attendance-table-body">
-            <tr><td colspan="6" class="text-center kp-text-muted py-4">Memuat data...</td></tr>
+            <tr><td colspan="7" class="text-center kp-text-muted py-4">Memuat data...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1180,9 +1181,28 @@ function renderScanResult(res) {
     box.innerHTML =
       '<div class="kp-scan-result ok">' +
       '<i class="fa-solid fa-circle-check ic"></i>' +
-      '<div><div class="title">' + escapeHtml(res.member.nama) + '</div>' +
-      '<div class="sub">No. ' + escapeHtml(res.member.noAnggota) + ' &middot; ' + escapeHtml(res.member.ranting) + ' &middot; ' + escapeHtml(res.member.jamHadir) + '</div></div>' +
-      '</div>';
+      '<div style="flex:1;"><div class="title">' + escapeHtml(res.member.nama) + '</div>' +
+      '<div class="sub">No. ' + escapeHtml(res.member.noAnggota) + ' &middot; ' + escapeHtml(res.member.ranting) + ' &middot; ' + escapeHtml(res.member.jamHadir) + '</div>' +
+      (res.member.row ? '<button class="btn btn-sm kp-btn-gold mt-2" id="btn-quick-transport" data-row="' + res.member.row + '"><i class="fa-solid fa-money-bill-wave"></i> Serahkan Transport</button>' : '') +
+      '</div></div>';
+    var qb = document.getElementById('btn-quick-transport');
+    if (qb) {
+      qb.addEventListener('click', function () {
+        var rowQ = qb.getAttribute('data-row');
+        qb.disabled = true;
+        api('markTransport', { row: rowQ }).then(function (r2) {
+          if (r2 && r2.success) {
+            qb.outerHTML = '<div class="mt-2" style="font-size:.8rem; color:var(--kp-success); font-weight:700;"><i class="fa-solid fa-check"></i> Transport diserahkan</div>';
+          } else {
+            Swal.fire('Gagal', (r2 && r2.message) || 'Terjadi kesalahan', 'error');
+            qb.disabled = false;
+          }
+        }).catch(function () {
+          Swal.fire('Gagal', 'Koneksi bermasalah', 'error');
+          qb.disabled = false;
+        });
+      });
+    }
   } else {
     var nama = (res.member && res.member.nama) ? escapeHtml(res.member.nama) : '';
     box.innerHTML =
@@ -1229,6 +1249,54 @@ function bindAttendancePage() {
   document.getElementById('btn-refresh-attendance').addEventListener('click', loadAttendanceData);
   document.getElementById('btn-export-attendance').addEventListener('click', exportAttendanceExcel);
   document.getElementById('btn-print-attendance').addEventListener('click', printAttendance);
+
+  // Tombol serah / batal transport
+  document.getElementById('attendance-table-body').addEventListener('click', function (e) {
+    var btnSerah = e.target.closest('button[data-transport]');
+    var btnBatal = e.target.closest('button[data-transport-cancel]');
+
+    if (btnSerah) {
+      var row = btnSerah.getAttribute('data-transport');
+      var namaRow = btnSerah.closest('tr').children[2].textContent;
+      Swal.fire({
+        icon: 'question',
+        title: 'Serahkan uang transport?',
+        html: 'Penerima: <b>' + escapeHtml(namaRow) + '</b>',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Serahkan',
+        cancelButtonText: 'Batal'
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        btnSerah.disabled = true;
+        api('markTransport', { row: row }).then(function (res) {
+          if (res && res.success) { toast('success', 'Transport diserahkan'); loadAttendanceData(); }
+          else { Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan', 'error'); btnSerah.disabled = false; }
+        }).catch(function () {
+          Swal.fire('Gagal', 'Koneksi bermasalah', 'error');
+          btnSerah.disabled = false;
+        });
+      });
+    }
+
+    if (btnBatal) {
+      var rowC = btnBatal.getAttribute('data-transport-cancel');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Batalkan penyerahan transport?',
+        text: 'Catatan penyerahan akan dihapus.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Batalkan',
+        cancelButtonText: 'Tidak',
+        confirmButtonColor: '#DC2626'
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        api('markTransport', { row: rowC, cancel: true }).then(function (res) {
+          if (res && res.success) { toast('success', res.message); loadAttendanceData(); }
+          else Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan', 'error');
+        });
+      });
+    }
+  });
 }
 
 function initAttendancePage() {
@@ -1262,10 +1330,20 @@ function loadAttendanceData() {
     lastAttendanceRows = rows;
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center kp-text-muted py-4">Belum ada data kehadiran</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center kp-text-muted py-4">Belum ada data kehadiran</td></tr>';
     } else {
       tbody.innerHTML = rows.map(function (r) {
         var badgeCls = (r.status === 'Tamu') ? 'kp-badge-draft' : 'kp-badge-aktif';
+        var isAdmin = STATE.user && STATE.user.role === 'Admin';
+        var transportCell;
+        if (r.transport === 'Sudah') {
+          transportCell = '<span class="kp-badge kp-badge-aktif" title="Oleh ' + escapeHtml(r.transportOleh) + ' pukul ' + escapeHtml(r.transportJam) + '">' +
+            '<i class="fa-solid fa-check"></i> Sudah</span>' +
+            (isAdmin ? ' <button class="btn btn-sm btn-link text-danger p-0 ms-1 kp-no-print" data-transport-cancel="' + r.row + '" title="Batalkan"><i class="fa-solid fa-rotate-left"></i></button>' : '');
+        } else {
+          transportCell = '<button class="btn btn-sm kp-btn-gold kp-no-print" data-transport="' + r.row + '">' +
+            '<i class="fa-solid fa-money-bill-wave"></i> Serahkan</button>';
+        }
         return '<tr>' +
           '<td>' + r.no + '</td>' +
           '<td>' + escapeHtml(r.noAnggota) + '</td>' +
@@ -1273,13 +1351,17 @@ function loadAttendanceData() {
           '<td>' + escapeHtml(r.ranting) + '</td>' +
           '<td>' + escapeHtml(r.jamHadir) + '</td>' +
           '<td><span class="kp-badge ' + badgeCls + '">' + escapeHtml(r.status) + '</span></td>' +
+          '<td>' + transportCell + '</td>' +
           '</tr>';
       }).join('');
     }
     var tAnggota = (res && res.totalAnggota !== undefined) ? res.totalAnggota : rows.length;
     var tTamu = (res && res.totalTamu) ? res.totalTamu : 0;
+    var tTransport = (res && res.totalTransport) ? res.totalTransport : 0;
     document.getElementById('attendance-total-info').textContent =
-      'Anggota hadir: ' + tAnggota + (tTamu ? '  \u00b7  Tamu undangan: ' + tTamu : '');
+      'Anggota hadir: ' + tAnggota +
+      (tTamu ? '  \u00b7  Tamu undangan: ' + tTamu : '') +
+      '  \u00b7  Transport diserahkan: ' + tTransport;
   });
 }
 
@@ -1299,25 +1381,27 @@ function exportAttendanceExcel() {
     [namaEvent],
     ['Diexport: ' + tanggalExport],
     [],
-    ['No', 'No Anggota', 'Nama', 'Ranting', 'Jam Hadir', 'Status']
+    ['No', 'No Anggota', 'Nama', 'Ranting', 'Jam Hadir', 'Status', 'Transport', 'Jam Transport', 'Diserahkan Oleh']
   ];
   lastAttendanceRows.forEach(function (r) {
-    aoa.push([r.no, r.noAnggota, r.nama, r.ranting, r.jamHadir, r.status]);
+    aoa.push([r.no, r.noAnggota, r.nama, r.ranting, r.jamHadir, r.status, r.transport || 'Belum', r.transportJam || '', r.transportOleh || '']);
   });
   var jmlTamu = lastAttendanceRows.filter(function (r) { return r.status === 'Tamu'; }).length;
   var jmlAnggota = lastAttendanceRows.length - jmlTamu;
+  var jmlTransport = lastAttendanceRows.filter(function (r) { return r.transport === 'Sudah'; }).length;
   aoa.push([]);
   aoa.push(['Anggota hadir: ' + jmlAnggota + ' orang']);
   if (jmlTamu) aoa.push(['Tamu undangan: ' + jmlTamu + ' orang']);
+  aoa.push(['Transport diserahkan: ' + jmlTransport + ' orang']);
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
 
   // Gabungkan sel judul agar melebar 6 kolom
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 8 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 8 } }
   ];
 
   // Lebar kolom
@@ -1327,7 +1411,10 @@ function exportAttendanceExcel() {
     { wch: 30 },
     { wch: 15 },
     { wch: 20 },
-    { wch: 10 }
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 20 },
+    { wch: 16 }
   ];
 
   var wb = XLSX.utils.book_new();
